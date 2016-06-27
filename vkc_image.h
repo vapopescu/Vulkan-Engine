@@ -1,7 +1,6 @@
 #ifndef VKC_IMAGE_H
 #define VKC_IMAGE_H
 
-#include <vk_settings.h>
 #include <vulkan.h>
 
 #include <vkc_device.h>
@@ -9,6 +8,8 @@
 
 /**
  * Class used for image handling.
+ *
+ * Classes named "Vkc[class]" stand for "Vulkan custom class".
  */
 class VkcImage
 {
@@ -30,6 +31,7 @@ public:
     VkcImage();
     VkcImage(
             VkImageType     type,
+            VkExtent3D      extent,
             VkFormat        format,
             VkcDevice       logicalDevice
             );
@@ -37,6 +39,7 @@ public:
 
     void create(
             VkImageType     type,
+            VkExtent3D      extent,
             VkFormat        format,
             VkcDevice       device
             );
@@ -45,9 +48,16 @@ public:
     void createView(
             VkcDevice       device
             );
+    void changeLayout(
+            VkImageLayout oldLayout,
+            VkImageLayout newLayout,
+            VkCommandBuffer commandBuffer
+            );
 
-    void bindMemory(
-            VkcDevice       device
+private:
+    void getAccessMask(
+            VkAccessFlags &accessMask,
+            VkImageLayout layout
             );
 };
 

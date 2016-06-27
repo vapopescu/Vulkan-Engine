@@ -1,8 +1,6 @@
 #include "vk_context.h"
 
 
-///******************************       QT Functions        ******************************///
-
 /**
  * Initialize the vulkan context
  */
@@ -15,8 +13,15 @@ VkContext::VkContext(QObject *parent, uint32_t wId) : QObject(parent)
     if (DEBUG)
         printDevices();
 
-    devices[ACTIVE_DEVICE].create(surface, 1);
+    devices[ACTIVE_DEVICE].create(1, surface);
     swapchain.create(surface, devices[ACTIVE_DEVICE]);
+    pipeline.create(swapchain.renderPass, devices[ACTIVE_DEVICE]);
+
+    square.create(devices[ACTIVE_DEVICE]);
+
+    camera.setProjectionMatrix(3.14159 / 2, (float)WIDTH / HEIGHT, 1, 100);
+
+    setupRender(devices[ACTIVE_DEVICE]);
 }
 
 
@@ -25,6 +30,11 @@ VkContext::VkContext(QObject *parent, uint32_t wId) : QObject(parent)
  */
 VkContext::~VkContext()
 {
+    square.destroy();
+
+    unsetupRender(devices[ACTIVE_DEVICE]);
+
+    pipeline.destroy();
     swapchain.destroy();
 
     for (int i = 0; i < devices.size(); i++)
@@ -33,13 +43,16 @@ VkContext::~VkContext()
     if (surface != VK_NULL_HANDLE)
         vkDestroySurfaceKHR(instance, surface, NULL);
 
-    if (DEBUG && debugReport != VK_NULL_HANDLE)
+#if DEBUG == 1
+    if (debugReport != VK_NULL_HANDLE)
         pfDestroyDebugReportCallbackEXT(instance, debugReport, NULL);
+#endif
 
     if (instance != NULL)
         vkDestroyInstance(instance, NULL);
 }
 
+#if DEBUG == 1
 /**
   * Used by the Vulkan debug layer.
   */
@@ -57,8 +70,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vkDebugCallback(
     QString output = "";
 
     if (flags & VK_DEBUG_REPORT_INFORMATION_BIT_EXT)
-        return VK_FALSE;
-      //output.append("INFO:    ");
+        output.append("INFO:    ");
     if (flags & VK_DEBUG_REPORT_WARNING_BIT_EXT)
         output.append("WARNING: ");
     if (flags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT)
@@ -74,9 +86,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vkDebugCallback(
 
     return VK_FALSE;
 }
+#endif
 
-
-///******************************       Vulkan Constructors        ******************************///
 
 /**
  * Defines application and instance parameters and creates the Vulkan instance.
@@ -98,48 +109,84 @@ void VkContext::createInstance()
         VK_MAKE_VERSION(1, 0, 8)            //uint32_t           apiVersion;
     } ;
 
+    //Setup instance layers and extentions.
+    static QVector<const char*> instanceLayers =
+    {
+        #if DEBUG == 1
+        "VK_LAYER_LUNARG_standard_validation"
+        #endif
+    };
+
+    static QVector<const char*> instanceExtentions =
+    {
+        VK_KHR_SURFACE_EXTENSION_NAME,
+
+        #if DEBUG == 1
+        VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+        #endif
+
+        #ifdef _WIN32
+        VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+
+        #elif __ANDROID__
+        VK_KHR_ANDROID_SURFACE_EXTENSION_NAME
+
+        #else
+        VK_KHR_XCB_SURFACE_EXTENSION_NAME;
+        #endif
+    };
+
+#if DEBUG == 1
     //Fill debug report callback info.
     VkDebugReportCallbackCreateInfoEXT  debugReportInfo =
     {
         VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,    //VkStructureType                 sType;
         NULL,                                                       //const void*                     pNext;
-        VK_DEBUG_REPORT_INFORMATION_BIT_EXT |                       //VkDebugReportFlagsEXT           flags;
+        0 |                                                         //VkDebugReportFlagsEXT           flags;
+        //VK_DEBUG_REPORT_INFORMATION_BIT_EXT |
         VK_DEBUG_REPORT_WARNING_BIT_EXT |
         VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
         VK_DEBUG_REPORT_ERROR_BIT_EXT |
-        VK_DEBUG_REPORT_DEBUG_BIT_EXT |
+        //VK_DEBUG_REPORT_DEBUG_BIT_EXT |
         0,
 
         (PFN_vkDebugReportCallbackEXT)vkDebugCallback,              //PFN_vkDebugReportCallbackEXT    pfnCallback;
         NULL                                                        //void*                           pUserData;
     };
 
+    void *pDebugReportInfo = &debugReportInfo;
+#else
+    void *pDebugReportInfo = NULL;
+#endif
+
     //Fill instance info.
     VkInstanceCreateInfo instanceInfo =
     {
         VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,             //VkStructureType             sType;
-        DEBUG ? &debugReportInfo : NULL,                    //const void*                 pNext;
+        pDebugReportInfo,                                   //const void*                 pNext;
         0,                                                  //VkInstanceCreateFlags       flags;
 
         &applicationInfo,                                   //const VkApplicationInfo*    pApplicationInfo;
 
-        (uint32_t)VkSettings::instanceLayers.size(),        //uint32_t                    enabledLayerCount;
-        VkSettings::instanceLayers.data(),                  //const char* const*          ppEnabledLayerNames;
+        (uint32_t)instanceLayers.size(),        //uint32_t                    enabledLayerCount;
+        instanceLayers.data(),                  //const char* const*          ppEnabledLayerNames;
 
-        (uint32_t)VkSettings::instanceExtentions.size(),    //uint32_t                    enabledExtensionCount;
-        VkSettings::instanceExtentions.data(),              //const char* const*          ppEnabledExtensionNames;
+        (uint32_t)instanceExtentions.size(),    //uint32_t                    enabledExtensionCount;
+        instanceExtentions.data(),              //const char* const*          ppEnabledExtensionNames;
     };
 
     //Create instance.
     vkCreateInstance(&instanceInfo, NULL, &instance);
 
+#if DEBUG == 1
     //Get function pointers.
     GET_IPROC(instance, CreateDebugReportCallbackEXT);
     GET_IPROC(instance, DestroyDebugReportCallbackEXT);
 
     //Create the debug report callback.
-    if (DEBUG)
-        pfCreateDebugReportCallbackEXT(instance, &debugReportInfo, NULL, &debugReport);
+    pfCreateDebugReportCallbackEXT(instance, &debugReportInfo, NULL, &debugReport);
+#endif
+
 }
 
 
@@ -197,44 +244,6 @@ void VkContext::createSurface(VkSurfaceKHR &surface, uint32_t id)
 
 
 /**
- * Create a semaphore.
- */
-void VkContext::createSemaphore(VkSemaphore &semaphore, VkcDevice device)
-{
-    //Fill semaphore create info.
-    VkSemaphoreCreateInfo semaphoreInfo =
-    {
-        VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,    //VkStructureType           sType;
-        NULL,                                       //const void*               pNext;
-        0                                           //VkSemaphoreCreateFlags    flags;
-    };
-
-    //Create semaphore.
-    vkCreateSemaphore(device.logical, &semaphoreInfo, NULL, &semaphore);
-}
-
-
-/**
- * Create a fence.
- */
-void VkContext::createFence(VkFence &fence, VkcDevice device)
-{
-    //Fill fence create info.
-    VkFenceCreateInfo fenceInfo =
-    {
-        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,    //VkStructureType           sType;
-        NULL,                                   //const void*               pNext;
-        0                                       //VkFenceCreateFlags        flags;
-    };
-
-    //Create fence.
-    vkCreateFence(device.logical, &fenceInfo, NULL, &fence);
-}
-
-
-///******************************       Vulkan Getters        ******************************///
-
-/**
  * Gets the physical device data.
  */
 void VkContext::getPhysicalDevices()
@@ -286,90 +295,84 @@ void VkContext::getPhysicalDevices()
 
 
 /**
- * Get the access mask specific to the layout.
+ * Create render utility objects.
  */
-void VkContext::getAccessMask(VkAccessFlags &accessMask, VkImageLayout layout)
+void VkContext::setupRender(VkcDevice device)
 {
-    switch (layout)
+    //Create uniform buffer.
+    uniformBuffer.create(16 * sizeof(float), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, device);
+
+
+    //Fill semaphore create info.
+    VkSemaphoreCreateInfo semaphoreInfo =
     {
-    case VK_IMAGE_LAYOUT_GENERAL:
-        accessMask =
-                VK_ACCESS_MEMORY_READ_BIT |
-                VK_ACCESS_MEMORY_WRITE_BIT;
-        break;
+        VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,    //VkStructureType           sType;
+        NULL,                                       //const void*               pNext;
+        0                                           //VkSemaphoreCreateFlags    flags;
+    };
 
-    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-        accessMask =
-                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        break;
+    //Create semaphores.
+    vkCreateSemaphore(device.logical, &semaphoreInfo, NULL, &sphAcquire);
+    vkCreateSemaphore(device.logical, &semaphoreInfo, NULL, &sphRender);
 
-    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-        accessMask =
-                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        break;
 
-    case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-        accessMask =
-                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                VK_ACCESS_MEMORY_READ_BIT;
-        break;
+    //Fill fence create info.
+    VkFenceCreateInfo fenceInfo =
+    {
+        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,    //VkStructureType           sType;
+        NULL,                                   //const void*               pNext;
+        0                                       //VkFenceCreateFlags        flags;
+    };
 
-    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-        accessMask =
-                VK_ACCESS_TRANSFER_WRITE_BIT;
-        break;
+    //Create fence.
+    vkCreateFence(device.logical, &fenceInfo, NULL, &fence);
 
-    default:
-        accessMask = 0;
-    }
+
+    //Fill descriptor buffer info.
+    VkDescriptorBufferInfo uniformBufferInfo =
+    {
+        uniformBuffer.handle,   //VkBuffer        buffer;
+        0,                      //VkDeviceSize    offset;
+        VK_WHOLE_SIZE           //VkDeviceSize    range;
+    };
+
+    //Fill write descriptor set info.
+    VkWriteDescriptorSet writeSet =
+    {
+        VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                            //VkStructureType                  sType;
+        NULL,                               //const void*                      pNext;
+
+        pipeline.descriptorSets[0],         //VkDescriptorSet                  dstSet;
+        0,                                  //uint32_t                         dstBinding;
+        0,                                  //uint32_t                         dstArrayElement;
+        1,                                  //uint32_t                         descriptorCount;
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,  //VkDescriptorType                 descriptorType;
+
+        NULL,                               //const VkDescriptorImageInfo*     pImageInfo;
+        &uniformBufferInfo,                 //const VkDescriptorBufferInfo*    pBufferInfo;
+        NULL                                //const VkBufferView*              pTexelBufferView;
+    };
+
+    //Update descriptor set.
+    vkUpdateDescriptorSets(device.logical, 1, &writeSet, 0, NULL);
 }
 
 
-///******************************       Vulkan Methods        ******************************///
-
 /**
- * Changes image layout.
+ * Destroy render utility objects.
  */
-void VkContext::changeImageLayout(VkcImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer commandBuffer)
+void VkContext::unsetupRender(VkcDevice device)
 {
-    //Setup access masks.
-    VkAccessFlags srcAccessMask;
-    VkAccessFlags dstAccessMask;
+    //Destroy uniform buffer.
+    uniformBuffer.destroy();
 
-    getAccessMask(srcAccessMask, oldLayout);
-    getAccessMask(dstAccessMask, newLayout);
+    //Destroy semaphores.
+    vkDestroySemaphore(device.logical, sphAcquire, NULL);
+    vkDestroySemaphore(device.logical, sphRender, NULL);
 
-    //Setup image barrier.
-    VkImageMemoryBarrier imageBarrier =
-    {
-        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, //VkStructureType            sType;
-        NULL,                                   //const void*                pNext;
-
-        srcAccessMask,                          //VkAccessFlags              srcAccessMask;
-        dstAccessMask,                          //VkAccessFlags              dstAccessMask;
-
-        oldLayout,                              //VkImageLayout              oldLayout;
-        newLayout,                              //VkImageLayout              newLayout;
-
-        VK_QUEUE_FAMILY_IGNORED,                //uint32_t                   srcQueueFamilyIndex;
-        VK_QUEUE_FAMILY_IGNORED,                //uint32_t                   dstQueueFamilyIndex;
-
-        image.handle,                           //VkImage                    image;
-        image.resourceRange                     //VkImageSubresourceRange    subresourceRange;
-    };
-
-    //Register barrier in command buffer.
-    vkCmdPipelineBarrier(
-                commandBuffer,
-                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                0,
-                0, NULL,
-                0, NULL,
-                1, &imageBarrier
-                );
+    //Destroy fence.
+    vkDestroyFence(device.logical, fence, NULL);
 }
 
 
@@ -378,24 +381,18 @@ void VkContext::changeImageLayout(VkcImage image, VkImageLayout oldLayout, VkIma
  */
 void VkContext::render(VkcDevice device, VkcSwapchain swapchain, uint32_t queueIdx, uint32_t commandBufferIdx)
 {
-    //Create semaphores and a fence.
-    VkSemaphore semaphore1, semaphore2;
-    createSemaphore(semaphore1, device);
-    createSemaphore(semaphore2, device);
-
-    VkFence fence;
-    createFence(fence, device);
-
+    //Get the queue and command buffer (for this thread <- to implement).
     VkQueue activeQueue = device.queueFamilies[ACTIVE_FAMILY].queues[queueIdx];
     VkCommandBuffer commandBuffer = device.commandBuffers[commandBufferIdx];
 
     //Get the next image available.
     uint32_t nextImageIdx;
-    VkResult result = vkAcquireNextImageKHR(device.logical, swapchain.handle, UINT64_MAX, semaphore1, fence, &nextImageIdx);
+    VkResult result = vkAcquireNextImageKHR(device.logical, swapchain.handle, UINT64_MAX, sphAcquire, fence, &nextImageIdx);
     VkcImage nextImage = swapchain.colorImages[nextImageIdx];
 
+
     //Fill commmand buffer begin info.
-    VkCommandBufferBeginInfo beginInfo =
+    VkCommandBufferBeginInfo commandBeginInfo =
     {
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,    //VkStructureType                          sType;
         NULL,                                           //const void*                              pNext;
@@ -403,6 +400,56 @@ void VkContext::render(VkcDevice device, VkcSwapchain swapchain, uint32_t queueI
 
         NULL                                            //const VkCommandBufferInheritanceInfo*    pInheritanceInfo;
     };
+
+    //Begin command recording.
+    vkBeginCommandBuffer(commandBuffer, &commandBeginInfo);
+
+    //Change image layout to color attachment optimal.
+    nextImage.changeLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, commandBuffer);
+
+
+    //Fill render pass begin info.
+    VkClearValue clearValue [2] = {CLEAR_COLOR, {1.0f, 0.0f}};
+    VkRenderPassBeginInfo renderPassBeginInfo =
+    {
+        VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,       //VkStructureType        sType;
+        NULL,                                           //const void*            pNext;
+
+        swapchain.renderPass,                           //VkRenderPass           renderPass;
+        swapchain.frameBuffers[nextImageIdx],           //VkFramebuffer          framebuffer;
+        {0, 0, WIDTH, HEIGHT},                          //VkRect2D               renderArea;
+        2,                                              //uint32_t               clearValueCount;
+        clearValue                                      //const VkClearValue*    pClearValues;
+    };
+
+    //Begin render pass.
+    vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    //Bind the graphics pipeline.
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.handle);
+
+    //Bind descriptor sets.
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0,
+                            1, &pipeline.descriptorSets[0], 0, NULL);
+
+
+    //Get the view-projection matrix.
+    QMatrix4x4 vpMatrix;
+    camera.getViewProjectionMatrix(vpMatrix);
+
+    //Render our entities.
+    square.render(commandBuffer, uniformBuffer, vpMatrix, device);
+
+    //End render pass.
+    vkCmdEndRenderPass(commandBuffer);
+
+
+    //Change image layout to present.
+    nextImage.changeLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, commandBuffer);
+
+    //Stop command recording.
+    vkEndCommandBuffer(commandBuffer);
+
 
     //Fill queue submit info.
     VkPipelineStageFlags stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -412,7 +459,7 @@ void VkContext::render(VkcDevice device, VkcSwapchain swapchain, uint32_t queueI
         NULL,                               //const void*                    pNext;
 
         1,                                  //uint32_t                       waitSemaphoreCount;
-        &semaphore1,                        //const VkSemaphore*             pWaitSemaphores;
+        &sphAcquire,                        //const VkSemaphore*             pWaitSemaphores;
 
         &stageMask,                         //const VkPipelineStageFlags*    pWaitDstStageMask;
 
@@ -420,8 +467,17 @@ void VkContext::render(VkcDevice device, VkcSwapchain swapchain, uint32_t queueI
         &commandBuffer,                     //const VkCommandBuffer*         pCommandBuffers;
 
         1,                                  //uint32_t                       signalSemaphoreCount;
-        &semaphore2                         //const VkSemaphore*             pSignalSemaphores;
+        &sphRender                          //const VkSemaphore*             pSignalSemaphores;
     };
+
+    //Submit queue.
+    vkQueueSubmit(activeQueue, 1, &submitInfo, fence);
+
+    vkWaitForFences(device.logical, 1, &fence, VK_TRUE, UINT64_MAX);
+    vkResetFences(device.logical, 1, &fence);
+
+    vkResetCommandBuffer(commandBuffer, 0);
+
 
     //Fill queue present info.
     VkPresentInfoKHR presentInfo =
@@ -430,7 +486,7 @@ void VkContext::render(VkcDevice device, VkcSwapchain swapchain, uint32_t queueI
         NULL,                               //const void*              pNext;
 
         1,                                  //uint32_t                 waitSemaphoreCount;
-        &semaphore2,                        //const VkSemaphore*       pWaitSemaphores;
+        &sphRender,                         //const VkSemaphore*       pWaitSemaphores;
 
         1,                                  //uint32_t                 swapchainCount;
         &swapchain.handle,                  //const VkSwapchainKHR*    pSwapchains;
@@ -439,30 +495,8 @@ void VkContext::render(VkcDevice device, VkcSwapchain swapchain, uint32_t queueI
         &result                             //VkResult*                pResults;
     };
 
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
-
-    changeImageLayout(nextImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, commandBuffer);
-
-    vkCmdClearColorImage(commandBuffer, nextImage.handle, VK_IMAGE_LAYOUT_GENERAL, &VkSettings::clearColor, 1, &nextImage.resourceRange);
-
-    changeImageLayout(nextImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, commandBuffer);
-
-    vkEndCommandBuffer(commandBuffer);
-
-    vkQueueSubmit(activeQueue, 1, &submitInfo, fence);
-
-    vkWaitForFences(device.logical, 1, &fence, VK_TRUE, UINT64_MAX);
-    vkResetFences(device.logical, 1, &fence);
-
-    vkResetCommandBuffer(commandBuffer, 0);
-
     //Now present.
     vkQueuePresentKHR(activeQueue, &presentInfo);
-
-    //Destroy semaphores and the fence.
-    vkDestroySemaphore(device.logical, semaphore1, NULL);
-    vkDestroySemaphore(device.logical, semaphore2, NULL);
-    vkDestroyFence(device.logical, fence, NULL);
 }
 
 /**

@@ -3,15 +3,18 @@
 
 #include <QVector>
 
-#include <vk_settings.h>
 #include <vulkan.h>
+#include <vk_utils.h>
 
 #include <vkc_device.h>
 #include <vkc_image.h>
+#include <vkc_pipeline.h>
 
 
 /**
  * Class used for swap chains.
+ *
+ * Classes named "Vkc[class]" stand for "Vulkan custom class".
  */
 class VkcSwapchain
 {

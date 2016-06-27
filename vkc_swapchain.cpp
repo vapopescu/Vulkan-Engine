@@ -100,8 +100,7 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
 
     //Get queue families.
     QVector<uint32_t> queueFamilies;
-    for (int i = 0; i < device.queueFamilies.count(); i++)
-        queueFamilies.append(device.queueFamilies[i].index);
+    device.getQueueFamilies(queueFamilies);
 
     //Fill swap chain info.
     VkSwapchainCreateInfoKHR swapchainInfo =
@@ -127,8 +126,8 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
         preTransform,                                   //VkSurfaceTransformFlagBitsKHR    preTransform;
         VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,              //VkCompositeAlphaFlagBitsKHR      compositeAlpha;
         presentMode,                                    //VkPresentModeKHR                 presentMode;
-        true,                                           //VkBool32                         clipped;
-        handle                                          //VkSwapchainKHR                   oldSwapchain;
+        VK_TRUE,                                        //VkBool32                         clipped;
+        VK_NULL_HANDLE                                  //VkSwapchainKHR                   oldSwapchain;
     };
 
     //Destroy old swap chain (if existent).
@@ -137,7 +136,6 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
 
     //Create swap chain.
     vkCreateSwapchainKHR(device.logical, &swapchainInfo, NULL, &handle);
-
 
     //Get actual image number.
     vkGetSwapchainImagesKHR(device.logical, handle, &imageCount, NULL);
@@ -169,7 +167,7 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
     }
 
     //Create depth image
-    depthImage.create(VK_IMAGE_TYPE_2D, VK_FORMAT_D24_UNORM_S8_UINT, device);
+    depthImage.create(VK_IMAGE_TYPE_2D, {WIDTH, HEIGHT, 1}, VK_FORMAT_D24_UNORM_S8_UINT, device);
 
     //Fill attachment descriptions.
     VkAttachmentDescription attachmentDescription[2] =
@@ -178,7 +176,7 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
             0,                                                  //VkAttachmentDescriptionFlags    flags;
 
             surfaceFormats[0].format,                           //VkFormat                        format;
-            SAMPLE_COUNT,                                       //VkSampleCountFlagBits           samples;
+            VK_SAMPLE_COUNT_1_BIT,                              //VkSampleCountFlagBits           samples;
 
             VK_ATTACHMENT_LOAD_OP_CLEAR,                        //VkAttachmentLoadOp              loadOp;
             VK_ATTACHMENT_STORE_OP_STORE,                       //VkAttachmentStoreOp             storeOp;
@@ -194,7 +192,7 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
             0,                                                  //VkAttachmentDescriptionFlags    flags;
 
             depthImage.format,                                  //VkFormat                        format;
-            SAMPLE_COUNT,                                       //VkSampleCountFlagBits           samples;
+            VK_SAMPLE_COUNT_1_BIT,                              //VkSampleCountFlagBits           samples;
 
             VK_ATTACHMENT_LOAD_OP_CLEAR,                        //VkAttachmentLoadOp              loadOp;
             VK_ATTACHMENT_STORE_OP_DONT_CARE,                   //VkAttachmentStoreOp             storeOp;
@@ -225,7 +223,7 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
     VkSubpassDescription subpassDescription =
     {
         0,                                  //VkSubpassDescriptionFlags       flags;
-        VK_PIPELINE_BIND_POINT_GRAPHICS,    //VkPipelineBindPouint32_t             pipelineBindPoint;
+        VK_PIPELINE_BIND_POINT_GRAPHICS,    //VkPipelineBindPouint32_t        pipelineBindPoint;
 
         0,                                  //uint32_t                        inputAttachmentCount;
         NULL,                               //const VkAttachmentReference*    pInputAttachments;

@@ -18,8 +18,12 @@ HEADERS += \
     vkc_swapchain.h \
     vkc_image.h \
     vkc_device.h \
-    vk_settings.h \
-    vk_context.h
+    vkc_entity.h \
+    vkc_pipeline.h \
+    vkc_camera.h \
+    vk_context.h \
+    vk_utils.h \
+    vkc_buffer.h
 
 SOURCES += \
     main.cpp \
@@ -27,7 +31,11 @@ SOURCES += \
     vkc_swapchain.cpp \
     vkc_image.cpp \
     vkc_device.cpp \
-    vk_context.cpp
+    vk_context.cpp \
+    vkc_entity.cpp \
+    vkc_pipeline.cpp \
+    vkc_camera.cpp \
+    vkc_buffer.cpp
 
 FORMS += \
     appwindow.ui
@@ -39,6 +47,7 @@ DISTFILES += \
 QMAKE_CXXFLAGS += \
     -Wno-unused-parameter \
     -Wno-unused-variable \
+    -Wno-pointer-arith \
     -Wno-missing-field-initializers
 
 VK_SDK = "C:/Program Files/VulkanSDK 1.0.13.0"

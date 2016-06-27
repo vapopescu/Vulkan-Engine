@@ -14,17 +14,17 @@ VkcImage::VkcImage()
     format =            VK_FORMAT_UNDEFINED;
     resourceRange =     {};
 
-    logicalDevice =            VK_NULL_HANDLE;
+    logicalDevice =     VK_NULL_HANDLE;
 }
 
 
 /**
  * Initialize and create image.
  */
-VkcImage::VkcImage(VkImageType type, VkFormat format, VkcDevice device)
+VkcImage::VkcImage(VkImageType type, VkExtent3D extent, VkFormat format, VkcDevice device)
 {
     VkcImage();
-    create(type, format, device);
+    create(type, extent, format, device);
 }
 
 
@@ -40,28 +40,30 @@ VkcImage::~VkcImage()
 /**
  * Create an image with given type and format.
  */
-void VkcImage::create(VkImageType type, VkFormat format, VkcDevice device)
+void VkcImage::create(VkImageType type, VkExtent3D extent, VkFormat format, VkcDevice device)
 {
     //Set flags according to format
     VkImageUsageFlags   usageMask =     0;
     VkImageAspectFlags  aspectMask =    0;
+    VkImageLayout       layout  =       VK_IMAGE_LAYOUT_UNDEFINED;
 
     if (format >= VK_FORMAT_R4G4_UNORM_PACK8 && format <= VK_FORMAT_B10G11R11_UFLOAT_PACK32)
     {
         usageMask =     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
         aspectMask =    VK_IMAGE_ASPECT_COLOR_BIT;
+        layout  =       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     }
 
     if (format >= VK_FORMAT_D16_UNORM && format <= VK_FORMAT_D32_SFLOAT_S8_UINT)
     {
         usageMask =     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
         aspectMask =    VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+        layout  =       VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     }
 
     //Get queue families.
     QVector<uint32_t> queueFamilies;
-    for (int i = 0; i < device.queueFamilies.count(); i++)
-        queueFamilies.append(device.queueFamilies[i].index);
+    device.getQueueFamilies(queueFamilies);
 
     //Fill image create info.
     VkImageCreateInfo imageInfo =
@@ -73,11 +75,11 @@ void VkcImage::create(VkImageType type, VkFormat format, VkcDevice device)
         type,                                           //VkImageType              imageType;
         format,                                         //VkFormat                 format;
 
-        {WIDTH, HEIGHT, 1},                             //VkExtent3D               extent;
+        extent,                                         //VkExtent3D               extent;
         1,                                              //uint32_t                 mipLevels;
         1,                                              //uint32_t                 arrayLayers;
 
-        SAMPLE_COUNT,                                   //VkSampleCountFlagBits    samples;
+        VK_SAMPLE_COUNT_1_BIT,                          //VkSampleCountFlagBits    samples;
         VK_IMAGE_TILING_OPTIMAL,                        //VkImageTiling            tiling;
         usageMask,                                      //VkImageUsageFlags        usage;
         VK_SHARING_MODE_EXCLUSIVE,                      //VkSharingMode            sharingMode;
@@ -104,11 +106,97 @@ void VkcImage::create(VkImageType type, VkFormat format, VkcDevice device)
         1,              //uint32_t              layerCount;
     };
 
-    //Bind image to memory.
-    this->bindMemory(device);
+    //Get image memory requirements.
+    VkMemoryRequirements memoryRequirements;
+    vkGetImageMemoryRequirements(device.logical, handle, &memoryRequirements);
+
+    //Get memory type index.
+    uint32_t memoryTypeIdx = 0;
+    VkMemoryPropertyFlags memoryMask = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    device.getMemoryTypeIndex(memoryTypeIdx, memoryMask, memoryRequirements);
+
+    //Fill image memory allocate info.
+    VkMemoryAllocateInfo memoryInfo =
+    {
+        VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, //VkStructureType    sType;
+        NULL,                                   //const void*        pNext;
+
+        memoryRequirements.size,                //VkDeviceSize       allocationSize;
+        memoryTypeIdx                           //uint32_t           memoryTypeIndex;
+    };
+
+    //Allocate image memory.
+    vkAllocateMemory(device.logical, &memoryInfo, NULL, &memory);
+
+    //Bind memory to image.
+    vkBindImageMemory(device.logical, handle, memory, 0);
 
     //Create image view.
     this->createView(device);
+
+    //Fill fence create info.
+    VkFenceCreateInfo fenceInfo =
+    {
+        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,    //VkStructureType           sType;
+        NULL,                                   //const void*               pNext;
+        0                                       //VkFenceCreateFlags        flags;
+    };
+
+    //Create fence.
+    VkFence fence;
+    vkCreateFence(device.logical, &fenceInfo, NULL, &fence);
+
+    VkQueue activeQueue = device.queueFamilies[ACTIVE_FAMILY].queues[0];
+    VkCommandBuffer commandBuffer = device.commandBuffers[0];
+
+    //Fill commmand buffer begin info.
+    VkCommandBufferBeginInfo commandBeginInfo =
+    {
+        VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,    //VkStructureType                          sType;
+        NULL,                                           //const void*                              pNext;
+        VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,    //VkCommandBufferUsageFlags                flags;
+
+        NULL                                            //const VkCommandBufferInheritanceInfo*    pInheritanceInfo;
+    };
+
+    //Begin command recording.
+    vkBeginCommandBuffer(commandBuffer, &commandBeginInfo);
+
+    //Change image layout to optimal.
+    changeLayout(VK_IMAGE_LAYOUT_UNDEFINED, layout, commandBuffer);
+
+    //Stop command recording.
+    vkEndCommandBuffer(commandBuffer);
+
+    //Fill queue submit info.
+    VkPipelineStageFlags stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkSubmitInfo submitInfo =
+    {
+        VK_STRUCTURE_TYPE_SUBMIT_INFO,      //VkStructureType                sType;
+        NULL,                               //const void*                    pNext;
+
+        0,                                  //uint32_t                       waitSemaphoreCount;
+        NULL,                               //const VkSemaphore*             pWaitSemaphores;
+
+        &stageMask,                         //const VkPipelineStageFlags*    pWaitDstStageMask;
+
+        1,                                  //uint32_t                       commandBufferCount;
+        &commandBuffer,                     //const VkCommandBuffer*         pCommandBuffers;
+
+        0,                                  //uint32_t                       signalSemaphoreCount;
+        NULL                                //const VkSemaphore*             pSignalSemaphores;
+    };
+
+    //Submit queue.
+    vkQueueSubmit(activeQueue, 1, &submitInfo, fence);
+
+    vkWaitForFences(device.logical, 1, &fence, VK_TRUE, UINT64_MAX);
+    vkResetFences(device.logical, 1, &fence);
+
+    vkResetCommandBuffer(commandBuffer, 0);
+
+    //Destroy the fence.
+    vkDestroyFence(device.logical, fence, NULL);
 }
 
 
@@ -129,7 +217,6 @@ void VkcImage::destroy()
         if (memory != VK_NULL_HANDLE)
         {
             vkFreeMemory(logicalDevice, memory, NULL);
-            vkUnmapMemory(logicalDevice, memory);
             memory = VK_NULL_HANDLE;
         }
 
@@ -142,6 +229,10 @@ void VkcImage::destroy()
     }
 }
 
+
+/**
+ * Creates a view for the image.
+ */
 void VkcImage::createView(VkcDevice device)
 {
     //Fill image view info.
@@ -168,43 +259,86 @@ void VkcImage::createView(VkcDevice device)
 
 
 /**
- * Allocate memory and bind the image to it.
+ * Registers the commands to change image layout.
  */
-void VkcImage::bindMemory(VkcDevice device)
+void VkcImage::changeLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer commandBuffer)
 {
-    //Get image memory requirements.
-    VkMemoryRequirements memoryRequirements;
-    vkGetImageMemoryRequirements(device.logical, handle, &memoryRequirements);
+    //Setup access masks.
+    VkAccessFlags srcAccessMask;
+    VkAccessFlags dstAccessMask;
 
-    uint32_t memoryTypeIndex = 0;
-    VkMemoryPropertyFlags desiredMemoryFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    getAccessMask(srcAccessMask, oldLayout);
+    getAccessMask(dstAccessMask, newLayout);
 
-    for (uint32_t i = 0; i < device.memoryProperties.memoryTypeCount; i++)
+    //Setup image barrier.
+    VkImageMemoryBarrier imageBarrier =
     {
-        VkMemoryType memoryType = device.memoryProperties.memoryTypes[i];
-        if ((memoryRequirements.memoryTypeBits >> i) & 1)
-        {
-            if ((memoryType.propertyFlags & desiredMemoryFlags) == desiredMemoryFlags)
-            {
-                memoryTypeIndex = i;
-                break;
-            }
-        }
-    }
+        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, //VkStructureType            sType;
+        NULL,                                   //const void*                pNext;
 
-    //Fill image memory allocate info.
-    VkMemoryAllocateInfo memoryInfo =
-    {
-        VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, //VkStructureType    sType;
-        NULL,                                   //const void*        pNext;
+        srcAccessMask,                          //VkAccessFlags              srcAccessMask;
+        dstAccessMask,                          //VkAccessFlags              dstAccessMask;
 
-        memoryRequirements.size,                //VkDeviceSize       allocationSize;
-        memoryTypeIndex                         //uint32_t           memoryTypeIndex;
+        oldLayout,                              //VkImageLayout              oldLayout;
+        newLayout,                              //VkImageLayout              newLayout;
+
+        VK_QUEUE_FAMILY_IGNORED,                //uint32_t                   srcQueueFamilyIndex;
+        VK_QUEUE_FAMILY_IGNORED,                //uint32_t                   dstQueueFamilyIndex;
+
+        handle,                                 //VkImage                    image;
+        resourceRange                           //VkImageSubresourceRange    subresourceRange;
     };
 
-    //Allocate image memory.
-    vkAllocateMemory(device.logical, &memoryInfo, NULL, &memory);
+    //Register barrier in command buffer.
+    vkCmdPipelineBarrier(
+                commandBuffer,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                0,
+                0, NULL,
+                0, NULL,
+                1, &imageBarrier
+                );
+}
 
-    //Bind memory to image.
-    vkBindImageMemory(device.logical, handle, memory, 0);
+
+/**
+ * Get the access mask specific to the image layout.
+ */
+void VkcImage::getAccessMask(VkAccessFlags &accessMask, VkImageLayout layout)
+{
+    switch (layout)
+    {
+    case VK_IMAGE_LAYOUT_GENERAL:
+        accessMask =
+                VK_ACCESS_MEMORY_READ_BIT |
+                VK_ACCESS_MEMORY_WRITE_BIT;
+        break;
+
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+        accessMask =
+                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        break;
+
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+        accessMask =
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        break;
+
+    case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+        accessMask =
+                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                VK_ACCESS_MEMORY_READ_BIT;
+        break;
+
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+        accessMask =
+                VK_ACCESS_TRANSFER_WRITE_BIT;
+        break;
+
+    default:
+        accessMask = 0;
+    }
 }
