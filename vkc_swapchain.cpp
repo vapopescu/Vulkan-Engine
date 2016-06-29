@@ -9,51 +9,25 @@ VkcSwapchain::VkcSwapchain()
     handle =                VK_NULL_HANDLE;
     renderPass =            VK_NULL_HANDLE;
 
-    colorImages =           {};
-    depthImage =            {};
-
-    frameBuffers =          {};
-
-    surfaceCapabilities =   {};
-
-    surfaceFormats =        {};
-    presentModes =          {};
+    clearValues[0] =        {0.8f, 0.8f, 1.0f, 1.0f};
+    clearValues[1] =        {1.0f, 0.0f};
 
     logicalDevice =         VK_NULL_HANDLE;
 }
 
 
 /**
- * Initialize and create swapchain.
- */
-VkcSwapchain::VkcSwapchain(VkSurfaceKHR surface, VkcDevice device)
-{
-    VkcSwapchain();
-    create(surface, device);
-}
-
-
-/**
- * We will handle the cleanup ourselves.
- */
-VkcSwapchain::~VkcSwapchain()
-{
-    //destroy();
-}
-
-
-/**
  * Create the swapchain.
  */
-void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
+VkcSwapchain::VkcSwapchain(VkSurfaceKHR surface, const VkcDevice *device) : VkcSwapchain()
 {
     //Get surface format number.
     uint32_t formatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device.physical, surface, &formatCount, NULL);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device->physical, surface, &formatCount, NULL);
 
     //Get surface formats.
     surfaceFormats.resize(formatCount);
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device.physical, surface, &formatCount, surfaceFormats.data());
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device->physical, surface, &formatCount, surfaceFormats.data());
 
     if  (surfaceFormats.size() == 1 && surfaceFormats[0].format == VK_FORMAT_UNDEFINED)
         surfaceFormats[0].format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -62,8 +36,10 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
         if (surfaceFormats[i].format == VK_FORMAT_R8G8B8A8_UNORM)
             surfaceFormats.move(i, 0);
 
+
     //Get surface capabilities.
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device.physical, surface, &surfaceCapabilities);
+    VkSurfaceCapabilitiesKHR    surfaceCapabilities;
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device->physical, surface, &surfaceCapabilities);
 
     uint32_t imageCount = 3;
     if (imageCount < surfaceCapabilities.minImageCount)
@@ -71,24 +47,29 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
     if (imageCount > surfaceCapabilities.maxImageCount && surfaceCapabilities.maxImageCount != 0)
         imageCount = surfaceCapabilities.maxImageCount;
 
-    VkExtent2D extent = surfaceCapabilities.currentExtent;
-    if (extent.width == UINT32_MAX)
+    extent = surfaceCapabilities.currentExtent;
+    if (extent.width == UINT32_MAX || extent.height == UINT32_MAX)
     {
-        extent.width = WIDTH;
-        extent.height = HEIGHT;
+#if DEBUG == 1
+        qDebug() << "ERROR:   [@qDebug]              - Surface extent is undefined. Swapchain not created.";
+#endif
+        delete this;
+        return;
     }
 
     VkSurfaceTransformFlagBitsKHR preTransform = surfaceCapabilities.currentTransform;
     if (preTransform & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
         preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 
+
     //Get present mode number.
     uint32_t modeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device.physical, surface, &modeCount, NULL);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device->physical, surface, &modeCount, NULL);
 
     //Get present modes.
+    QVector<VkPresentModeKHR> presentModes;
     presentModes.resize(modeCount);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device.physical, surface, &modeCount, presentModes.data());
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device->physical, surface, &modeCount, presentModes.data());
 
     VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
     for (int i = 0; i < presentModes.size(); i++)
@@ -100,7 +81,7 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
 
     //Get queue families.
     QVector<uint32_t> queueFamilies;
-    device.getQueueFamilies(queueFamilies);
+    device->getQueueFamilies(queueFamilies);
 
     //Fill swap chain info.
     VkSwapchainCreateInfoKHR swapchainInfo =
@@ -130,44 +111,29 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
         VK_NULL_HANDLE                                  //VkSwapchainKHR                   oldSwapchain;
     };
 
-    //Destroy old swap chain (if existent).
-    if (handle != VK_NULL_HANDLE)
-        vkDestroySwapchainKHR(device.logical, handle, NULL);
-
     //Create swap chain.
-    vkCreateSwapchainKHR(device.logical, &swapchainInfo, NULL, &handle);
+    vkCreateSwapchainKHR(device->logical, &swapchainInfo, NULL, &handle);
+
 
     //Get actual image number.
-    vkGetSwapchainImagesKHR(device.logical, handle, &imageCount, NULL);
+    vkGetSwapchainImagesKHR(device->logical, handle, &imageCount, NULL);
 
     //Get images.
     QVector<VkImage> images;
     images.resize(imageCount);
     colorImages.resize(imageCount);
-    vkGetSwapchainImagesKHR(device.logical, handle, &imageCount, images.data());
+    vkGetSwapchainImagesKHR(device->logical, handle, &imageCount, images.data());
 
     //Fill data fields.
-    this->logicalDevice = device.logical;
+    this->logicalDevice = device->logical;
 
     for (uint32_t i = 0; i < imageCount; i++)
-    {
-        this->colorImages[i].handle = images[i];
-        this->colorImages[i].type = VK_IMAGE_TYPE_2D;
-        this->colorImages[i].format = surfaceFormats[0].format;
+        colorImages[i] = new VkcColorImage(images[i], {extent.width, extent.height, 1}, surfaceFormats[0].format, device->logical);
 
-        colorImages[i].resourceRange = {
-            VK_IMAGE_ASPECT_COLOR_BIT,  //VkImageAspectFlags    aspectMask;
-            0,                          //uint32_t              baseMipLevel;
-            1,                          //uint32_t              levelCount;
-            0,                          //uint32_t              baseArrayLayer;
-            1,                          //uint32_t              layerCount;
-        };
-
-        colorImages[i].createView(device);
-    }
 
     //Create depth image
-    depthImage.create(VK_IMAGE_TYPE_2D, {WIDTH, HEIGHT, 1}, VK_FORMAT_D24_UNORM_S8_UINT, device);
+    depthImage = new VkcDepthImage({extent.width, extent.height, 1}, device);
+
 
     //Fill attachment descriptions.
     VkAttachmentDescription attachmentDescription[2] =
@@ -191,7 +157,7 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
         {
             0,                                                  //VkAttachmentDescriptionFlags    flags;
 
-            depthImage.format,                                  //VkFormat                        format;
+            depthImage->format,                                 //VkFormat                        format;
             VK_SAMPLE_COUNT_1_BIT,                              //VkSampleCountFlagBits           samples;
 
             VK_ATTACHMENT_LOAD_OP_CLEAR,                        //VkAttachmentLoadOp              loadOp;
@@ -257,12 +223,12 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
     };
 
     //Create render pass.
-    vkCreateRenderPass(device.logical, &renderPassInfo, NULL, &renderPass);
+    vkCreateRenderPass(device->logical, &renderPassInfo, NULL, &renderPass);
 
 
     //Fill framebuffer info.
     VkImageView attachments[2];
-    attachments[1] = depthImage.view;
+    attachments[1] = depthImage->view;
 
     VkFramebufferCreateInfo frameBufferInfo =
     {
@@ -274,8 +240,8 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
         2,                                          //uint32_t                    attachmentCount;
         attachments,                                //const VkImageView*          pAttachments;
 
-        WIDTH,                                      //uint32_t                    width;
-        HEIGHT,                                     //uint32_t                    height;
+        extent.width,                               //uint32_t                    width;
+        extent.height,                              //uint32_t                    height;
         1                                           //uint32_t                    layers;
     };
 
@@ -283,9 +249,9 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
     frameBuffers.resize(imageCount);
     for (uint32_t i = 0; i < imageCount; i++)
     {
-        attachments[0] = colorImages[i].view;
+        attachments[0] = colorImages[i]->view;
 
-        vkCreateFramebuffer(device.logical, &frameBufferInfo, NULL, &frameBuffers[i]);
+        vkCreateFramebuffer(device->logical, &frameBufferInfo, NULL, &frameBuffers[i]);
     }
 }
 
@@ -293,41 +259,33 @@ void VkcSwapchain::create(VkSurfaceKHR surface, VkcDevice device)
 /**
  * Destroy the swapchain.
  */
-void VkcSwapchain::destroy()
+VkcSwapchain::~VkcSwapchain()
 {
     if (logicalDevice != VK_NULL_HANDLE)
     {
+        if (renderPass != VK_NULL_HANDLE)
+            vkDestroyRenderPass(logicalDevice, renderPass, NULL);
+
         while (frameBuffers.size() > 0)
         {
             if (frameBuffers[0] != VK_NULL_HANDLE)
                 vkDestroyFramebuffer(logicalDevice, frameBuffers[0], NULL);
+
             frameBuffers.removeFirst();
         }
 
-        if (renderPass != VK_NULL_HANDLE)
-        {
-            vkDestroyRenderPass(logicalDevice, renderPass, NULL);
-            renderPass = VK_NULL_HANDLE;
-        }
-
-        depthImage.destroy();
-
         while (colorImages.size() > 0)
         {
-            if (colorImages[0].view != VK_NULL_HANDLE)
-            {
-                vkDestroyImageView(logicalDevice, colorImages[0].view, NULL);
-                colorImages[0].view = VK_NULL_HANDLE;
-            }
+            if (colorImages[0]->view != VK_NULL_HANDLE)
+                vkDestroyImageView(logicalDevice, colorImages[0]->view, NULL);
+
             colorImages.removeFirst();
         }
 
-        if (handle != VK_NULL_HANDLE)
-        {
-            vkDestroySwapchainKHR(logicalDevice, handle, NULL);
-            handle = VK_NULL_HANDLE;
-        }
+        if (depthImage != NULL)
+            delete depthImage;
 
-        logicalDevice = VK_NULL_HANDLE;
+        if (handle != VK_NULL_HANDLE)
+            vkDestroySwapchainKHR(logicalDevice, handle, NULL);
     }
 }

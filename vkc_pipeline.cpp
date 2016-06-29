@@ -13,36 +13,15 @@ VkcPipeline::VkcPipeline()
     fragShader =        VK_NULL_HANDLE;
 
     descriptorPool =    VK_NULL_HANDLE;
-    descriptorSets =    {};
-    setLayouts =        {};
 
     logicalDevice =     VK_NULL_HANDLE;
 }
 
 
 /**
- * Initialize and create pipeline.
- */
-VkcPipeline::VkcPipeline(VkRenderPass renderPass, VkcDevice device)
-{
-    VkcPipeline();
-    create(renderPass, device);
-}
-
-
-/**
- * We will handle the cleanup ourselves.
- */
-VkcPipeline::~VkcPipeline()
-{
-    //destroy();
-}
-
-
-/**
  * Create the graphics pipeline.
  */
-void VkcPipeline::create(VkRenderPass renderPass, VkcDevice device)
+VkcPipeline::VkcPipeline(const VkcSwapchain *swapchain, const VkcDevice *device) : VkcPipeline()
 {
     //Fill descriptor set binding info.
     QVector<QVector<VkDescriptorSetLayoutBinding>> setBindings =
@@ -50,22 +29,22 @@ void VkcPipeline::create(VkRenderPass renderPass, VkcDevice device)
         //Set 0
         {
             {
-                0,                                      //uint32_t              binding;
-                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,      //VkDescriptorType      descriptorType;
-                1,                                      //uint32_t              descriptorCount;
-                VK_SHADER_STAGE_VERTEX_BIT,             //VkShaderStageFlags    stageFlags;
-                NULL                                    //const VkSampler*      pImmutableSamplers;
+                0,                                          //uint32_t              binding;
+                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,          //VkDescriptorType      descriptorType;
+                1,                                          //uint32_t              descriptorCount;
+                VK_SHADER_STAGE_VERTEX_BIT,                 //VkShaderStageFlags    stageFlags;
+                NULL                                        //const VkSampler*      pImmutableSamplers;
             }
         },
 
         //Set 1
         {
             {
-                0,                                      //uint32_t              binding;
-                VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,       //VkDescriptorType      descriptorType;
-                1,                                      //uint32_t              descriptorCount;
-                VK_SHADER_STAGE_FRAGMENT_BIT,           //VkShaderStageFlags    stageFlags;
-                NULL                                    //const VkSampler*      pImmutableSamplers;
+                0,                                          //uint32_t              binding;
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,  //VkDescriptorType      descriptorType;
+                1,                                          //uint32_t              descriptorCount;
+                VK_SHADER_STAGE_FRAGMENT_BIT,               //VkShaderStageFlags    stageFlags;
+                NULL                                        //const VkSampler*      pImmutableSamplers;
             }
         }
     };
@@ -74,13 +53,13 @@ void VkcPipeline::create(VkRenderPass renderPass, VkcDevice device)
     QVector<VkDescriptorPoolSize> poolSizes =
     {
         {
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,      //VkDescriptorType    type;
-            1                                       //uint32_t            descriptorCount;
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,          //VkDescriptorType    type;
+            1                                           //uint32_t            descriptorCount;
         },
 
         {
-            VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,       //VkDescriptorType    type;
-            1                                       //uint32_t            descriptorCount;
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,  //VkDescriptorType    type;
+            1                                           //uint32_t            descriptorCount;
         }
     };
 
@@ -100,7 +79,7 @@ void VkcPipeline::create(VkRenderPass renderPass, VkcDevice device)
 
         //Create descriptor set layout.
         VkDescriptorSetLayout layout;
-        vkCreateDescriptorSetLayout(device.logical, &setLayoutInfo, NULL, &layout);
+        vkCreateDescriptorSetLayout(device->logical, &setLayoutInfo, NULL, &layout);
         setLayouts.append(layout);
     }
 
@@ -120,7 +99,7 @@ void VkcPipeline::create(VkRenderPass renderPass, VkcDevice device)
     };
 
     //Create descriptor pool.
-    vkCreateDescriptorPool(device.logical, &descriptorPoolInfo, NULL, &descriptorPool);
+    vkCreateDescriptorPool(device->logical, &descriptorPoolInfo, NULL, &descriptorPool);
 
 
     //Fill descriptor set allocate info.
@@ -139,7 +118,7 @@ void VkcPipeline::create(VkRenderPass renderPass, VkcDevice device)
 
     //Allocate space for descriptor sets.
     descriptorSets.resize(setLayouts.count());
-    vkAllocateDescriptorSets(device.logical, &descriptorSetAllocateInfo, descriptorSets.data());
+    vkAllocateDescriptorSets(device->logical, &descriptorSetAllocateInfo, descriptorSets.data());
 
 
     //Fill pipeline layout info.
@@ -158,7 +137,7 @@ void VkcPipeline::create(VkRenderPass renderPass, VkcDevice device)
     };
 
     //Create pipeline layout.
-    vkCreatePipelineLayout(device.logical, &pipelineLayoutInfo, NULL, &layout);
+    vkCreatePipelineLayout(device->logical, &pipelineLayoutInfo, NULL, &layout);
 
 
     //Create shaders.
@@ -210,7 +189,7 @@ void VkcPipeline::create(VkRenderPass renderPass, VkcDevice device)
         {
             0,                                  //uint32_t    location;
             0,                                  //uint32_t    binding;
-            VK_FORMAT_R32G32B32A32_SFLOAT,      //VkFormat    format;
+            VK_FORMAT_R32G32B32_SFLOAT,         //VkFormat    format;
             offsetof(VkVertex, x)               //uint32_t    offset;
         },
 
@@ -266,19 +245,19 @@ void VkcPipeline::create(VkRenderPass renderPass, VkcDevice device)
     //Fill viewport info.
     VkViewport viewport =
     {
-        0,                  //float    x;
-        0,                  //float    y;
-        WIDTH,              //float    width;
-        HEIGHT,             //float    height;
-        0,                  //float    minDepth;
-        1,                  //float    maxDepth;
+        0,                                  //float    x;
+        0,                                  //float    y;
+        (float)swapchain->extent.width,     //float    width;
+        (float)swapchain->extent.height,    //float    height;
+        0,                                  //float    minDepth;
+        1,                                  //float    maxDepth;
     };
 
     //Fill scissors info.
     VkRect2D scissors =
     {
-        0, 0,               //VkOffset2D    offset;
-        WIDTH, HEIGHT       //VkExtent2D    extent;
+        {0, 0},                 //VkOffset2D    offset;
+        swapchain->extent       //VkExtent2D    extent;
     };
 
     //Fill viewport state info.
@@ -449,23 +428,23 @@ void VkcPipeline::create(VkRenderPass renderPass, VkcDevice device)
         NULL,                                   //const VkPipelineDynamicStateCreateInfo*          pDynamicState;
 
         layout,                                 //VkPipelineLayout                                 layout;
-        renderPass,                             //VkRenderPass                                     renderPass;
+        swapchain->renderPass,                  //VkRenderPass                                     renderPass;
         0,                                      //uint32_t                                         subpass;
         VK_NULL_HANDLE,                         //VkPipeline                                       basePipelineHandle;
         0                                       //int32_t                                          basePipelineIndex;
     };
 
     //Create graphics pipeline.
-    vkCreateGraphicsPipelines(device.logical, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &handle);
+    vkCreateGraphicsPipelines(device->logical, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &handle);
 
-    this->logicalDevice = device.logical;
+    this->logicalDevice = device->logical;
 }
 
 
 /**
  * Destroy the graphics pipeline.
  */
-void VkcPipeline::destroy()
+VkcPipeline::~VkcPipeline()
 {
     if (logicalDevice != VK_NULL_HANDLE)
     {
@@ -479,36 +458,21 @@ void VkcPipeline::destroy()
         }
 
         if (descriptorPool != VK_NULL_HANDLE)
-        {
             vkDestroyDescriptorPool(logicalDevice, descriptorPool, NULL);
-            descriptorPool = VK_NULL_HANDLE;
-        }
 
 
         if (vertShader != VK_NULL_HANDLE)
-        {
             vkDestroyShaderModule(logicalDevice, vertShader, NULL);
-            vertShader = VK_NULL_HANDLE;
-        }
 
         if (fragShader != VK_NULL_HANDLE)
-        {
             vkDestroyShaderModule(logicalDevice, fragShader, NULL);
-            fragShader = VK_NULL_HANDLE;
-        }
 
 
         if (layout != VK_NULL_HANDLE)
-        {
             vkDestroyPipelineLayout(logicalDevice, layout, NULL);
-            layout = VK_NULL_HANDLE;
-        }
 
         if (handle != VK_NULL_HANDLE)
-        {
             vkDestroyPipeline(logicalDevice, handle, NULL);
-            handle = VK_NULL_HANDLE;
-        }
     }
 }
 
@@ -516,17 +480,20 @@ void VkcPipeline::destroy()
 /**
  * Load shader module from file.
  */
-void VkcPipeline::createShader(VkShaderModule &shader, const char *fileName, VkcDevice device)
+void VkcPipeline::createShader(VkShaderModule &shader, QString fileName, const VkcDevice *device)
 {
     //Open shader file in binary.
-    QFile shaderFile(fileName);
-    if(!shaderFile.open(QIODevice::ReadOnly))
+    QFile shaderFile("data/shaders/" + fileName);
+
+    if(!shaderFile.exists())
     {
 #if DEBUG == 1
         qDebug() << "ERROR:   [@qDebug]              - Shader \"" << fileName << "\" not found.";
 #endif
         exit(-1);
     }
+    else
+        shaderFile.open(QIODevice::ReadOnly);
 
     //Read shader data.
     QByteArray shaderData = shaderFile.readAll();
@@ -543,5 +510,5 @@ void VkcPipeline::createShader(VkShaderModule &shader, const char *fileName, Vkc
     };
 
     //Create shader module.
-    vkCreateShaderModule(device.logical, &shaderInfo, NULL, &shader);
+    vkCreateShaderModule(device->logical, &shaderInfo, NULL, &shader);
 }

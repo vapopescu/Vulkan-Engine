@@ -6,64 +6,60 @@
  */
 VkcImage::VkcImage()
 {
-    handle =            VK_NULL_HANDLE;
-    view =              VK_NULL_HANDLE;
-    memory =            VK_NULL_HANDLE;
+    handle =                VK_NULL_HANDLE;
+    view =                  VK_NULL_HANDLE;
+    sampler =               VK_NULL_HANDLE;
 
-    type =              VK_IMAGE_TYPE_2D;
-    format =            VK_FORMAT_UNDEFINED;
-    resourceRange =     {};
-
-    logicalDevice =     VK_NULL_HANDLE;
+    buffer =                VK_NULL_HANDLE;
+    memory =                VK_NULL_HANDLE;
+    logicalDevice =         VK_NULL_HANDLE;
 }
 
 
 /**
- * Initialize and create image.
- */
-VkcImage::VkcImage(VkImageType type, VkExtent3D extent, VkFormat format, VkcDevice device)
-{
-    VkcImage();
-    create(type, extent, format, device);
-}
-
-
-/**
- * We will handle the cleanup ourselves.
+ * Destroy the image.
  */
 VkcImage::~VkcImage()
 {
-    //destroy();
+    if (logicalDevice != VK_NULL_HANDLE)
+    {
+        if (view != VK_NULL_HANDLE)
+        {
+            vkDestroyImageView(logicalDevice, view, NULL);
+            view = VK_NULL_HANDLE;
+        }
+
+        if (sampler != VK_NULL_HANDLE)
+        {
+            vkDestroySampler(logicalDevice, sampler, NULL);
+            sampler = VK_NULL_HANDLE;
+        }
+
+        if (memory != VK_NULL_HANDLE)
+        {
+            vkFreeMemory(logicalDevice, memory, NULL);
+            memory = VK_NULL_HANDLE;
+        }
+
+        if (handle != VK_NULL_HANDLE)
+        {
+            vkDestroyImage(logicalDevice, handle, NULL);
+            handle = VK_NULL_HANDLE;
+        }
+
+        logicalDevice = VK_NULL_HANDLE;
+    }
 }
 
 
 /**
- * Create an image with given type and format.
+ * Create the image data and allocate memory.
  */
-void VkcImage::create(VkImageType type, VkExtent3D extent, VkFormat format, VkcDevice device)
+void VkcImage::createImage(const VkcDevice *device)
 {
-    //Set flags according to format
-    VkImageUsageFlags   usageMask =     0;
-    VkImageAspectFlags  aspectMask =    0;
-    VkImageLayout       layout  =       VK_IMAGE_LAYOUT_UNDEFINED;
-
-    if (format >= VK_FORMAT_R4G4_UNORM_PACK8 && format <= VK_FORMAT_B10G11R11_UFLOAT_PACK32)
-    {
-        usageMask =     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-        aspectMask =    VK_IMAGE_ASPECT_COLOR_BIT;
-        layout  =       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    }
-
-    if (format >= VK_FORMAT_D16_UNORM && format <= VK_FORMAT_D32_SFLOAT_S8_UINT)
-    {
-        usageMask =     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-        aspectMask =    VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-        layout  =       VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    }
-
     //Get queue families.
     QVector<uint32_t> queueFamilies;
-    device.getQueueFamilies(queueFamilies);
+    device->getQueueFamilies(queueFamilies);
 
     //Fill image create info.
     VkImageCreateInfo imageInfo =
@@ -81,7 +77,7 @@ void VkcImage::create(VkImageType type, VkExtent3D extent, VkFormat format, VkcD
 
         VK_SAMPLE_COUNT_1_BIT,                          //VkSampleCountFlagBits    samples;
         VK_IMAGE_TILING_OPTIMAL,                        //VkImageTiling            tiling;
-        usageMask,                                      //VkImageUsageFlags        usage;
+        usage,                                          //VkImageUsageFlags        usage;
         VK_SHARING_MODE_EXCLUSIVE,                      //VkSharingMode            sharingMode;
 
         (uint32_t)queueFamilies.size(),                 //uint32_t                 queueFamilyIndexCount;
@@ -91,29 +87,17 @@ void VkcImage::create(VkImageType type, VkExtent3D extent, VkFormat format, VkcD
     };
 
     //Create image.
-    vkCreateImage(device.logical, &imageInfo, NULL, &handle);
+    vkCreateImage(device->logical, &imageInfo, NULL, &handle);
 
-    //Setup data fields.
-    this->type = type;
-    this->format = format;
-    this->logicalDevice = device.logical;
-
-    resourceRange = {
-        aspectMask,     //VkImageAspectFlags    aspectMask;
-        0,              //uint32_t              baseMipLevel;
-        1,              //uint32_t              levelCount;
-        0,              //uint32_t              baseArrayLayer;
-        1,              //uint32_t              layerCount;
-    };
 
     //Get image memory requirements.
     VkMemoryRequirements memoryRequirements;
-    vkGetImageMemoryRequirements(device.logical, handle, &memoryRequirements);
+    vkGetImageMemoryRequirements(device->logical, handle, &memoryRequirements);
 
     //Get memory type index.
     uint32_t memoryTypeIdx = 0;
-    VkMemoryPropertyFlags memoryMask = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-    device.getMemoryTypeIndex(memoryTypeIdx, memoryMask, memoryRequirements);
+    VkMemoryPropertyFlags memoryType = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    device->getMemoryTypeIndex(memoryTypeIdx, memoryType, memoryRequirements);
 
     //Fill image memory allocate info.
     VkMemoryAllocateInfo memoryInfo =
@@ -126,13 +110,11 @@ void VkcImage::create(VkImageType type, VkExtent3D extent, VkFormat format, VkcD
     };
 
     //Allocate image memory.
-    vkAllocateMemory(device.logical, &memoryInfo, NULL, &memory);
+    vkAllocateMemory(device->logical, &memoryInfo, NULL, &memory);
 
     //Bind memory to image.
-    vkBindImageMemory(device.logical, handle, memory, 0);
+    vkBindImageMemory(device->logical, handle, memory, 0);
 
-    //Create image view.
-    this->createView(device);
 
     //Fill fence create info.
     VkFenceCreateInfo fenceInfo =
@@ -144,10 +126,10 @@ void VkcImage::create(VkImageType type, VkExtent3D extent, VkFormat format, VkcD
 
     //Create fence.
     VkFence fence;
-    vkCreateFence(device.logical, &fenceInfo, NULL, &fence);
+    vkCreateFence(device->logical, &fenceInfo, NULL, &fence);
 
-    VkQueue activeQueue = device.queueFamilies[ACTIVE_FAMILY].queues[0];
-    VkCommandBuffer commandBuffer = device.commandBuffers[0];
+    VkQueue activeQueue = device->queueFamilies[ACTIVE_FAMILY].queues[0];
+    VkCommandBuffer commandBuffer = device->queueFamilies[ACTIVE_FAMILY].commandBuffers[0];
 
     //Fill commmand buffer begin info.
     VkCommandBufferBeginInfo commandBeginInfo =
@@ -190,50 +172,20 @@ void VkcImage::create(VkImageType type, VkExtent3D extent, VkFormat format, VkcD
     //Submit queue.
     vkQueueSubmit(activeQueue, 1, &submitInfo, fence);
 
-    vkWaitForFences(device.logical, 1, &fence, VK_TRUE, UINT64_MAX);
-    vkResetFences(device.logical, 1, &fence);
+    vkWaitForFences(device->logical, 1, &fence, VK_TRUE, UINT64_MAX);
+    vkResetFences(device->logical, 1, &fence);
 
     vkResetCommandBuffer(commandBuffer, 0);
 
     //Destroy the fence.
-    vkDestroyFence(device.logical, fence, NULL);
-}
-
-
-/**
- * Destroy the image.
- */
-void VkcImage::destroy()
-{
-    if (logicalDevice != VK_NULL_HANDLE)
-    {
-
-        if (view != VK_NULL_HANDLE)
-        {
-            vkDestroyImageView(logicalDevice, view, NULL);
-            view = VK_NULL_HANDLE;
-        }
-
-        if (memory != VK_NULL_HANDLE)
-        {
-            vkFreeMemory(logicalDevice, memory, NULL);
-            memory = VK_NULL_HANDLE;
-        }
-
-        if (handle != VK_NULL_HANDLE)
-        {
-            vkDestroyImage(logicalDevice, handle, NULL);
-            handle = VK_NULL_HANDLE;
-        }
-        logicalDevice = VK_NULL_HANDLE;
-    }
+    vkDestroyFence(device->logical, fence, NULL);
 }
 
 
 /**
  * Creates a view for the image.
  */
-void VkcImage::createView(VkcDevice device)
+void VkcImage::createView()
 {
     //Fill image view info.
     VkImageViewCreateInfo viewInfo =
@@ -249,12 +201,47 @@ void VkcImage::createView(VkcDevice device)
         resourceRange                               //VkImageSubresourceRange    subresourceRange;
     };
 
-    //Destroy old image view (if existent).
-    if (view != VK_NULL_HANDLE)
-        vkDestroyImageView(device.logical, view, NULL);
-
     //Create image view.
-    vkCreateImageView(device.logical, &viewInfo, NULL, &view);
+    vkCreateImageView(logicalDevice, &viewInfo, NULL, &view);
+}
+
+
+/**
+ * Creates a sampler for the image.
+ */
+void VkcImage::createSampler()
+{
+    //Fill sampler info.
+    VkSamplerCreateInfo samplerInfo =
+    {
+        VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,      //VkStructureType         sType;
+        NULL,                                       //const void*             pNext;
+        0,                                          //VkSamplerCreateFlags    flags;
+
+        VK_FILTER_LINEAR,                           //VkFilter                magFilter;
+        VK_FILTER_LINEAR,                           //VkFilter                minFilter;
+        VK_SAMPLER_MIPMAP_MODE_LINEAR,              //VkSamplerMipmapMode     mipmapMode;
+
+        VK_SAMPLER_ADDRESS_MODE_REPEAT,             //VkSamplerAddressMode    addressModeU;
+        VK_SAMPLER_ADDRESS_MODE_REPEAT,             //VkSamplerAddressMode    addressModeV;
+        VK_SAMPLER_ADDRESS_MODE_REPEAT,             //VkSamplerAddressMode    addressModeW;
+        0.0f,                                       //float                   mipLodBias;
+
+        VK_TRUE,                                    //VkBool32                anisotropyEnable;
+        8,                                          //float                   maxAnisotropy;
+
+        VK_FALSE,                                   //VkBool32                compareEnable;
+        VK_COMPARE_OP_NEVER,                        //VkCompareOp             compareOp;
+
+        0.0f,                                       //float                   minLod;
+        5.0f,                                       //float                   maxLod;
+
+        VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,    //VkBorderColor           borderColor;
+        VK_FALSE,                                   //VkBool32                unnormalizedCoordinates;
+    };
+
+    //Create sampler.
+    vkCreateSampler(logicalDevice, &samplerInfo, NULL, &sampler);
 }
 
 
@@ -303,6 +290,16 @@ void VkcImage::changeLayout(VkImageLayout oldLayout, VkImageLayout newLayout, Vk
 
 
 /**
+ * Load data into the image buffer.
+ */
+void VkcImage::loadData(QImage uiImage)
+{
+    ///@todo
+    (void)uiImage;
+}
+
+
+/**
  * Get the access mask specific to the image layout.
  */
 void VkcImage::getAccessMask(VkAccessFlags &accessMask, VkImageLayout layout)
@@ -336,6 +333,11 @@ void VkcImage::getAccessMask(VkAccessFlags &accessMask, VkImageLayout layout)
     case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
         accessMask =
                 VK_ACCESS_TRANSFER_WRITE_BIT;
+        break;
+
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+        accessMask =
+                VK_ACCESS_SHADER_READ_BIT;
         break;
 
     default:

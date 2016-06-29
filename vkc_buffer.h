@@ -1,6 +1,10 @@
 #ifndef VKC_BUFFER_H
 #define VKC_BUFFER_H
 
+#if DEBUG == 1
+#include <QDebug>
+#endif
+
 #include <vulkan.h>
 
 #include <vkc_device.h>
@@ -15,11 +19,11 @@ class VkcBuffer
 {
     //Objects:
 public:
-    VkBuffer            handle =            VK_NULL_HANDLE;
-    VkDeviceMemory      memory =            VK_NULL_HANDLE;
+    VkBuffer            handle;
+    VkDeviceMemory      memory;
 
 private:
-    VkDevice            logicalDevice =     VK_NULL_HANDLE;
+    VkDevice            logicalDevice;
 
     //Functions:
 public:
@@ -27,17 +31,10 @@ public:
     VkcBuffer(
             VkDeviceSize            size,
             VkBufferUsageFlags      usageMask,
-            VkcDevice               device
+            const VkcDevice         *device
             );
 
     ~VkcBuffer();
-
-    void create(
-            VkDeviceSize            size,
-            VkBufferUsageFlags      usageMask,
-            VkcDevice               device
-            );
-    void destroy();
 };
 
 #endif // VKC_BUFFER_H

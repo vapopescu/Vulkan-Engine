@@ -1,12 +1,22 @@
 #ifndef APPWINDOW_H
 #define APPWINDOW_H
 
-#include <QMainWindow>
-#include <QTimer>
-#include <QLabel>
-#include <QDebug>
+#ifndef DEBUG
+#define DEBUG 0
+#endif
 
-#include <vk_context.h>
+#if DEBUG == 1
+#include <QDebug>
+#endif
+
+#include <QMainWindow>
+#include <QMouseEvent>
+#include <QTimer>
+
+#include "ui_appwindow.h"
+
+#include <ui_form.h>
+#include <vkc_instance.h>
 
 
 /**
@@ -19,6 +29,7 @@ namespace Ui
 class AppWindow;
 }
 
+
 /**
  * Class implementing the main window of the application.
  */
@@ -27,7 +38,7 @@ class AppWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit AppWindow(QWidget *parent = 0);
+    AppWindow(QWidget *parent = 0);
     ~AppWindow();
 
 public slots:
@@ -36,17 +47,18 @@ public slots:
 
 private:
     Ui::AppWindow   *ui;
-    VkContext       *vkContext;
-
+    VkcInstance     *vkcInstance;
     QWidget         *vkWidget;
-    QWidget         *guiWidget;
-    QLabel          *fpsLabel;
+
+    bool            drawUi;
+    GuiForm         *guiForm;
 
     QTimer          *fpsTimer;
-    int             frameCount = 0;
     QString         title;
 
-    bool event(QEvent *event);
+protected:
+    bool eventFilter(QObject *obj, QEvent *event);
 };
+
 
 #endif // APPWINDOW_H

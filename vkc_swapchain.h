@@ -2,13 +2,14 @@
 #define VKC_SWAPCHAIN_H
 
 #include <QVector>
+#if DEBUG == 1
+#include <QDebug>
+#endif
 
 #include <vulkan.h>
-#include <vk_utils.h>
 
 #include <vkc_device.h>
 #include <vkc_image.h>
-#include <vkc_pipeline.h>
 
 
 /**
@@ -20,36 +21,29 @@ class VkcSwapchain
 {
     //Objects:
 public:
-    VkSwapchainKHR                  handle =                VK_NULL_HANDLE;
-    VkRenderPass                    renderPass =            VK_NULL_HANDLE;
+    VkSwapchainKHR                  handle;
+    VkRenderPass                    renderPass;
 
-    QVector<VkcImage>               colorImages =           {};
-    VkcImage                        depthImage =            {};
+    QVector<VkcColorImage*>         colorImages;
+    VkcDepthImage                   *depthImage;
 
-    QVector<VkFramebuffer>          frameBuffers =          {};
+    QVector<VkFramebuffer>          frameBuffers;
 
-    VkSurfaceCapabilitiesKHR        surfaceCapabilities =   {};
-
-    QVector<VkSurfaceFormatKHR>     surfaceFormats =        {};
-    QVector<VkPresentModeKHR>       presentModes =          {};
+    VkExtent2D                      extent;
+    VkClearValue                    clearValues[2];
 
 private:
-    VkDevice                        logicalDevice =         VK_NULL_HANDLE;
+    QVector<VkSurfaceFormatKHR>     surfaceFormats;
+    VkDevice                        logicalDevice;
 
     //Functions:
 public:
     VkcSwapchain();
     VkcSwapchain(
-            VkSurfaceKHR    surface,
-            VkcDevice       device
+            VkSurfaceKHR            surface,
+            const VkcDevice         *device
             );
     ~VkcSwapchain();
-
-    void create(
-            VkSurfaceKHR    surface,
-            VkcDevice       device
-            );
-    void destroy();
 };
 
 #endif // VKC_SWAPCHAIN_H

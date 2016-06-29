@@ -12,32 +12,13 @@ VkcBuffer::VkcBuffer()
 
 
 /**
- * Initialize and create image.
- */
-VkcBuffer::VkcBuffer(VkDeviceSize size, VkBufferUsageFlags usageMask, VkcDevice device)
-{
-    VkcBuffer();
-    create(size, usageMask, device);
-}
-
-
-/**
- * We will handle the cleanup ourselves.
- */
-VkcBuffer::~VkcBuffer()
-{
-    //destroy();
-}
-
-
-/**
  * Create the buffer.
  */
-void VkcBuffer::create(VkDeviceSize size, VkBufferUsageFlags usageMask, VkcDevice device)
+VkcBuffer::VkcBuffer(VkDeviceSize size, VkBufferUsageFlags usageMask, const VkcDevice *device) : VkcBuffer()
 {
     //Get queue families.
     QVector<uint32_t> queueFamilies;
-    device.getQueueFamilies(queueFamilies);
+    device->getQueueFamilies(queueFamilies);
 
     //Fill buffer info.
     VkBufferCreateInfo bufferInfo =
@@ -55,15 +36,15 @@ void VkcBuffer::create(VkDeviceSize size, VkBufferUsageFlags usageMask, VkcDevic
         queueFamilies.data()                    //const uint32_t*        pQueueFamilyIndices;
     };
 
-    vkCreateBuffer(device.logical, &bufferInfo, NULL, &handle);
+    vkCreateBuffer(device->logical, &bufferInfo, NULL, &handle);
 
     //Get buffer memory requirements.
     VkMemoryRequirements memoryRequirements;
-    vkGetBufferMemoryRequirements(device.logical, handle, &memoryRequirements);
+    vkGetBufferMemoryRequirements(device->logical, handle, &memoryRequirements);
 
     uint32_t memoryTypeIdx = 0;
     VkMemoryPropertyFlags memoryMask = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-    device.getMemoryTypeIndex(memoryTypeIdx, memoryMask, memoryRequirements);
+    device->getMemoryTypeIndex(memoryTypeIdx, memoryMask, memoryRequirements);
 
     //Fill buffer memory allocate info.
     VkMemoryAllocateInfo memoryInfo =
@@ -76,34 +57,26 @@ void VkcBuffer::create(VkDeviceSize size, VkBufferUsageFlags usageMask, VkcDevic
     };
 
     //Allocate buffer memory.
-    vkAllocateMemory(device.logical, &memoryInfo, NULL, &memory);
+    vkAllocateMemory(device->logical, &memoryInfo, NULL, &memory);
 
     //Bind memory to buffer.
-    vkBindBufferMemory(device.logical, handle, memory, 0);
+    vkBindBufferMemory(device->logical, handle, memory, 0);
 
-    this->logicalDevice = device.logical;
+    this->logicalDevice = device->logical;
 }
 
 
 /**
  * Destroy the buffer.
  */
-void VkcBuffer::destroy()
+VkcBuffer::~VkcBuffer()
 {
     if (logicalDevice != VK_NULL_HANDLE)
     {
         if (memory != VK_NULL_HANDLE)
-        {
             vkFreeMemory(logicalDevice, memory, NULL);
-            memory = VK_NULL_HANDLE;
-        }
 
         if (handle != VK_NULL_HANDLE)
-        {
             vkDestroyBuffer(logicalDevice, handle, NULL);
-            handle = VK_NULL_HANDLE;
-        }
-
-        logicalDevice = VK_NULL_HANDLE;
     }
 }

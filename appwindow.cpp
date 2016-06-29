@@ -1,32 +1,33 @@
 #include "appwindow.h"
-#include "ui_appwindow.h"
 
 
 /**
  * Creates the main window of the application.
- *
- * @param parent The QObject to whom 'this' is to be attached as a child (NULL for no parent).
  */
 AppWindow::AppWindow(QWidget *parent) :
-    QMainWindow(parent),
+    QMainWindow(parent) ,
     ui(new Ui::AppWindow)
 {
+    installEventFilter(this);
+
     //Setup main window.
     ui->setupUi(this);
+    vkWidget = ui->vkWidget;
+    vkWidget->setAttribute(Qt::WA_MouseTracking);
+
+    //Setup gui form.
+    guiForm = new GuiForm(ui->mainWidget);
+    guiForm->setAttribute(Qt::WA_DontShowOnScreen);
+    guiForm->show();
+    drawUi = false;
 
     //Set resolution.
-    this->setFixedSize(WIDTH, HEIGHT);
-
-    //Get Vulkan and GUI widget handles and fit them to resolution.
-    vkWidget =  this->findChild<QWidget*>("vkWidget");
-    guiWidget = this->findChild<QWidget*>("guiWidget");
-    fpsLabel =  this->findChild<QLabel*>("fpsLabel");
-
+    this->setFixedSize(1600, 900);
     vkWidget->  setGeometry(0, 0, this->width(), this->height());
-    guiWidget-> setGeometry(0, 0, this->width(), this->height());
+    guiForm->   setGeometry(0, 0, this->width(), this->height());
 
     //Initialize Vulkan.
-    vkContext = new VkContext(this, (uint32_t)vkWidget->winId());
+    vkcInstance = new VkcInstance(vkWidget);
 
     //Initialize fps timer.
     fpsTimer = new QTimer(this);
@@ -45,25 +46,96 @@ AppWindow::AppWindow(QWidget *parent) :
  */
 AppWindow::~AppWindow()
 { 
+    removeEventFilter(this);
+
     delete fpsTimer;
 
-    delete vkContext;
+    delete guiForm;
+
+    delete vkcInstance;
     delete ui;
 }
 
 
-/**
- * Function called when an event occures.
- */
-bool AppWindow::event(QEvent *event)
+bool AppWindow::eventFilter(QObject *obj, QEvent *event)
 {
-    if (event->type() == QEvent::User)
+    QChildEvent     *childEvent;
+    QMouseEvent     *mouseEvent;
+
+    QWidget         *widget;
+    QPoint          pos;
+
+    switch (event->type())
     {
+    case QEvent::User:
         loop();
         return true;
-    }
 
-    return QMainWindow::event(event);
+    case QEvent::ChildAdded:
+        childEvent = (QChildEvent*)event;
+        childEvent->child()->installEventFilter(this);
+        return true;
+
+    case QEvent::ChildRemoved:
+        childEvent = (QChildEvent*)event;
+        childEvent->child()->removeEventFilter(this);
+        return true;
+
+    case QEvent::Paint:
+        if (UiForm *uiForm = qobject_cast<UiForm*>(obj))
+        {
+            if (drawUi)
+            {
+                uiForm->updated = false;
+                return false;
+            }
+            uiForm->updated = true;
+        }
+        return !drawUi;
+
+    case QEvent::MouseButtonPress:
+    case QEvent::MouseButtonRelease:
+    case QEvent::MouseButtonDblClick:
+    case QEvent::MouseMove:
+        mouseEvent = (QMouseEvent*) event;
+        pos = mouseEvent->windowPos().toPoint();
+        widget = ui->mainWidget->childAt(pos);
+
+        if (obj == vkWidget)
+        {
+            QEvent  *e = new QEvent(event->type());
+
+            if (widget != NULL)
+                QCoreApplication::sendEvent(widget, e);
+
+            return true;
+        }
+        if (QPushButton *button = qobject_cast<QPushButton*>(obj))
+        {
+            if (mouseEvent->type() == QEvent::MouseButtonRelease)
+                button->click();
+            return true;
+        }
+        else
+            return false;
+
+    case QEvent::Enter:
+        if (QWidget *widget = qobject_cast<QWidget*>(obj))
+        {
+            widget->setAttribute(Qt::WA_UnderMouse, true);
+        }
+        return true;
+
+    case QEvent::Leave:
+        if (QWidget *widget = qobject_cast<QWidget*>(obj))
+        {
+            widget->setAttribute(Qt::WA_UnderMouse, false);
+        }
+        return true;
+
+    default:
+        return QObject::eventFilter(obj, event);
+    }
 }
 
 
@@ -72,12 +144,21 @@ bool AppWindow::event(QEvent *event)
  */
 void AppWindow::loop()
 {
-    //Main render.
-    vkContext->render();
-    frameCount++;
+    //Render GUI.
+    QImage uiImage(size(), QImage::Format_ARGB32);
+    if(guiForm->updated)
+    {
+        drawUi = true;
+        guiForm->render(&uiImage, QPoint(), QRegion(), QWidget::DrawChildren);
+        drawUi = false;
 
-    //Render GUI. (not ready)
-    //guiWidget->update(guiWidget->rect());
+        vkcInstance->loadUi(uiImage);
+        //uiImage.save("gui.png");
+    }
+
+    //Main render.
+    vkcInstance->render();
+    guiForm->frameCount++;
 
     //Reenter loop() after processing all other events.
     QCoreApplication::postEvent(this, new QEvent(QEvent::User), -2);
@@ -89,8 +170,8 @@ void AppWindow::loop()
  */
 void AppWindow::showFps()
 {
-    this->setWindowTitle(title + QString("     (FPS:%1)").arg(frameCount));
+    this->setWindowTitle(title + QString("     (FPS:%1)").arg(guiForm->frameCount));
 
-    fpsLabel->setText(QString::number(frameCount, 10));
-    frameCount = 0;
+    guiForm->fpsLabel->setText(QString::number(guiForm->frameCount, 10));
+    guiForm->frameCount = 0;
 }

@@ -6,8 +6,16 @@
  */
 VkcCamera::VkcCamera()
 {
-    viewMatrix =            {};
-    projectionMatrix =      {};
+
+}
+
+
+/**
+ * Destroy the camera.
+ */
+VkcCamera::~VkcCamera()
+{
+
 }
 
 

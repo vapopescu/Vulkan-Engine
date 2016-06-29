@@ -3,11 +3,25 @@
 
 #include <QFile>
 #include <QVector>
+#if DEBUG == 1
+#include <QDebug>
+#endif
 
 #include <vulkan.h>
-#include <vk_utils.h>
 
 #include <vkc_device.h>
+#include <vkc_swapchain.h>
+
+
+/**
+ * Struct used to define vertex shader input layout and buffer size.
+ */
+struct VkVertex {
+    float x, y, z;
+    float u, v;
+    float nx, ny, nz;
+};
+
 
 /**
  * Class used for the graphics pipeline.
@@ -18,39 +32,33 @@ class VkcPipeline
 {
     //Objects:
 public:
-    VkPipeline                      handle =            VK_NULL_HANDLE;
-    VkPipelineLayout                layout =            VK_NULL_HANDLE;
+    VkPipeline                      handle;
+    VkPipelineLayout                layout;
 
-    VkShaderModule                  vertShader =        VK_NULL_HANDLE;
-    VkShaderModule                  fragShader =        VK_NULL_HANDLE;
+    VkShaderModule                  vertShader;
+    VkShaderModule                  fragShader;
 
-    VkDescriptorPool                descriptorPool =    VK_NULL_HANDLE;
-    QVector<VkDescriptorSet>        descriptorSets =    {};
-    QVector<VkDescriptorSetLayout>  setLayouts =        {};
+    VkDescriptorPool                descriptorPool;
+    QVector<VkDescriptorSet>        descriptorSets;
+    QVector<VkDescriptorSetLayout>  setLayouts;
 
 private:
-    VkDevice                        logicalDevice =     VK_NULL_HANDLE;
+    VkDevice                        logicalDevice;
 
     //Functions:
 public:
     VkcPipeline();
     VkcPipeline(
-            VkRenderPass    renderPass,
-            VkcDevice       device
+            const VkcSwapchain      *swapchain,
+            const VkcDevice         *device
             );
     ~VkcPipeline();
 
-    void create(
-            VkRenderPass    renderPass,
-            VkcDevice       device
-            );
-    void destroy();
-
 private:
     void createShader(
-            VkShaderModule &shader,
-            const char *fileName,
-            VkcDevice device
+            VkShaderModule          &shader,
+            QString                 fileName,
+            const VkcDevice         *device
             );
 };
 

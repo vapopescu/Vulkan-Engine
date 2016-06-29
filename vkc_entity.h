@@ -2,12 +2,15 @@
 #define VKC_ENTITY_H
 
 #include <QMatrix4x4>
+#if DEBUG == 1
+#include <QDebug>
+#endif
 
 #include <vulkan.h>
-#include <vk_utils.h>
 
 #include <vkc_device.h>
 #include <vkc_buffer.h>
+#include <vkc_pipeline.h>
 
 
 /**
@@ -18,32 +21,27 @@
 class VkcEntity
 {
     //Objects:
-public:
-    QVector<VkVertex>   vertices =          {};
-    QVector<uint32_t>   indices =           {};
+protected:
+    QVector<VkVertex>   vertices;
+    QVector<uint32_t>   indices;
 
-    QMatrix4x4          modelMatrix =       {};
+    QMatrix4x4          modelMatrix;
 
-    VkcBuffer           buffer =            {};
+    VkcBuffer           *buffer;
 
     //Functions:
 public:
     VkcEntity();
     VkcEntity(
-            VkcDevice       device
+            const VkcDevice     *device
             );
     ~VkcEntity();
 
-    void create(
-            VkcDevice       device
-            );
-    void destroy();
-
     void render(
-            VkCommandBuffer commandBuffer,
-            VkcBuffer       uniformBuffer,
-            QMatrix4x4      vpMatrix,
-            VkcDevice       device
+            VkCommandBuffer     commandBuffer,
+            const VkcBuffer     *uniformBuffer,
+            QMatrix4x4          vpMatrix,
+            const VkcDevice     *device
             );
 };
 

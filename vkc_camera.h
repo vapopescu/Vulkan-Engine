@@ -3,7 +3,9 @@
 
 #include <QtMath>
 #include <QMatrix4x4>
-
+#if DEBUG == 1
+#include <QDebug>
+#endif
 
 /**
  * Class used for managing view and projection matrices.
@@ -14,13 +16,13 @@ class VkcCamera
 {
     //Objects:
 private:
-    QMatrix4x4      viewMatrix =            {};
-    QMatrix4x4      projectionMatrix =      {};
+    QMatrix4x4      viewMatrix;
+    QMatrix4x4      projectionMatrix;
 
     //Functions:
 public:
     VkcCamera();
-    ~VkcCamera(){}
+    ~VkcCamera();
 
     void setProjectionMatrix(
             float verticalAngle,

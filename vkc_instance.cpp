@@ -1,25 +1,25 @@
-#include "vk_context.h"
+#include "vkc_instance.h"
 
 
 /**
- * Initialize the vulkan context
+ * Initialize the vulkan context.
  */
-VkContext::VkContext(QObject *parent, uint32_t wId) : QObject(parent)
+VkcInstance::VkcInstance(QWidget *parent) : QObject(parent)
 {
     createInstance();
-    createSurface(surface, wId);
-    getPhysicalDevices();
+    createSurface((uint32_t)parent->winId());
+    getDevices();
 
-    if (DEBUG)
-        printDevices();
+    swapchain = new VkcSwapchain(surface, devices[ACTIVE_DEVICE]);
+    pipeline = new VkcPipeline(swapchain, devices[ACTIVE_DEVICE]);
 
-    devices[ACTIVE_DEVICE].create(1, surface);
-    swapchain.create(surface, devices[ACTIVE_DEVICE]);
-    pipeline.create(swapchain.renderPass, devices[ACTIVE_DEVICE]);
+    square = new VkcEntity(devices[ACTIVE_DEVICE]);
 
-    square.create(devices[ACTIVE_DEVICE]);
+    width =     parent->width();
+    height =    parent->height();
 
-    camera.setProjectionMatrix(3.14159 / 2, (float)WIDTH / HEIGHT, 1, 100);
+    camera = new VkcCamera();
+    camera->setProjectionMatrix(3.14159 / 2, (float)width / (float)height, 1, 100);
 
     setupRender(devices[ACTIVE_DEVICE]);
 }
@@ -28,17 +28,24 @@ VkContext::VkContext(QObject *parent, uint32_t wId) : QObject(parent)
 /**
  * Destroy the Vulkan context.
  */
-VkContext::~VkContext()
+VkcInstance::~VkcInstance()
 {
-    square.destroy();
+    if (square != NULL)
+        delete square;
+
+    if (camera != NULL)
+        delete camera;
 
     unsetupRender(devices[ACTIVE_DEVICE]);
 
-    pipeline.destroy();
-    swapchain.destroy();
+    if (pipeline != NULL)
+    delete pipeline;
+
+    if (swapchain != NULL)
+    delete swapchain;
 
     for (int i = 0; i < devices.size(); i++)
-        devices[i].destroy();
+        delete devices[i];
 
     if (surface != VK_NULL_HANDLE)
         vkDestroySurfaceKHR(instance, surface, NULL);
@@ -52,11 +59,59 @@ VkContext::~VkContext()
         vkDestroyInstance(instance, NULL);
 }
 
-#if DEBUG == 1
+
+/**
+ * Call render (@todo on all contexts).
+ */
+void VkcInstance::render()
+{
+    render(devices[ACTIVE_DEVICE], swapchain);
+}
+
+
+/**
+ * Loads the ui image for render.
+ */
+void VkcInstance::loadUi(QImage uiImage)
+{
+    this->uiImage->loadData(uiImage);
+}
+
+
+/**
+ * Print the property list of all physical devices.
+ */
+void VkcInstance::printDevices(QFile file)
+{
+    file.open(QIODevice::WriteOnly);
+
+    for (int i = 0; i < devices.size(); i++)
+    {
+        VkPhysicalDeviceProperties devProp = devices[i]->properties;
+
+        //Interpret version data.
+        struct
+        {
+            uint32_t a, b, c;
+        } v;
+
+        v.a = VK_VERSION_MAJOR(devProp.apiVersion);
+        v.b = VK_VERSION_MINOR(devProp.apiVersion);
+        v.c = VK_VERSION_PATCH(devProp.apiVersion);
+
+        file.write(QString("Device Name:    %1\r\n").arg(devProp.deviceName).toStdString().data());
+        file.write(QString("Device Type:    %1\r\n").arg((int) devProp.deviceType).toStdString().data());
+        file.write(QString("API Version:    %1.%2.%3\r\n\r\n").arg(v.a).arg(v.b).arg(v.c).toStdString().data());
+    }
+
+    file.close();
+}
+
+
 /**
   * Used by the Vulkan debug layer.
   */
-
+#if DEBUG == 1
 VKAPI_ATTR VkBool32 VKAPI_CALL vkDebugCallback(
         VkDebugReportFlagsEXT                       flags,
         VkDebugReportObjectTypeEXT                  objectType,
@@ -84,6 +139,12 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vkDebugCallback(
 
     qDebug() << output.toStdString().data();
 
+    (void)objectType;
+    (void)object;
+    (void)location;
+    (void)messageCode;
+    (void)pUserData;
+
     return VK_FALSE;
 }
 #endif
@@ -92,7 +153,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vkDebugCallback(
 /**
  * Defines application and instance parameters and creates the Vulkan instance.
  */
-void VkContext::createInstance()
+void VkcInstance::createInstance()
 {
     //Fill application info.
     VkApplicationInfo applicationInfo =
@@ -162,17 +223,17 @@ void VkContext::createInstance()
     //Fill instance info.
     VkInstanceCreateInfo instanceInfo =
     {
-        VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,             //VkStructureType             sType;
-        pDebugReportInfo,                                   //const void*                 pNext;
-        0,                                                  //VkInstanceCreateFlags       flags;
+        VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,     //VkStructureType             sType;
+        pDebugReportInfo,                           //const void*                 pNext;
+        0,                                          //VkInstanceCreateFlags       flags;
 
-        &applicationInfo,                                   //const VkApplicationInfo*    pApplicationInfo;
+        &applicationInfo,                           //const VkApplicationInfo*    pApplicationInfo;
 
-        (uint32_t)instanceLayers.size(),        //uint32_t                    enabledLayerCount;
-        instanceLayers.data(),                  //const char* const*          ppEnabledLayerNames;
+        (uint32_t)instanceLayers.size(),            //uint32_t                    enabledLayerCount;
+        instanceLayers.data(),                      //const char* const*          ppEnabledLayerNames;
 
-        (uint32_t)instanceExtentions.size(),    //uint32_t                    enabledExtensionCount;
-        instanceExtentions.data(),              //const char* const*          ppEnabledExtensionNames;
+        (uint32_t)instanceExtentions.size(),        //uint32_t                    enabledExtensionCount;
+        instanceExtentions.data(),                  //const char* const*          ppEnabledExtensionNames;
     };
 
     //Create instance.
@@ -193,7 +254,7 @@ void VkContext::createInstance()
 /**
  * Creates the surface on which Vulkan will draw to.
  */
-void VkContext::createSurface(VkSurfaceKHR &surface, uint32_t id)
+void VkcInstance::createSurface(uint32_t id)
 {
 #ifdef _WIN32
     //Fill surface info.
@@ -246,61 +307,48 @@ void VkContext::createSurface(VkSurfaceKHR &surface, uint32_t id)
 /**
  * Gets the physical device data.
  */
-void VkContext::getPhysicalDevices()
+void VkcInstance::getDevices()
 {
     //Get the number of devices.
     uint32_t deviceCount;
     vkEnumeratePhysicalDevices(instance, &deviceCount, NULL);
 
     //Get the device list.
-    QVector<VkPhysicalDevice> physicalDevices;
+    QVector<VkPhysicalDevice> physicalDevices, vector;
     physicalDevices.resize(deviceCount);
-    devices.resize(deviceCount);
     vkEnumeratePhysicalDevices(instance, &deviceCount, physicalDevices.data());
 
-    for (int i = 0; i < devices.size(); i++)
+    for (int i = 0; i < physicalDevices.size(); i++)
     {
-        devices[i].destroy();
-        devices[i].physical = physicalDevices[i];
-
         //Get properties.
-        vkGetPhysicalDeviceProperties(devices[i].physical, &devices[i].properties);
-        vkGetPhysicalDeviceFeatures(devices[i].physical, &devices[i].features);
-        vkGetPhysicalDeviceMemoryProperties(devices[i].physical, &devices[i].memoryProperties);
+        VkPhysicalDeviceProperties deviceProperties;
+        vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProperties);
+
+        if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+            vector.prepend(physicalDevices[i]);
+
+        if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
+            vector.append(physicalDevices[i]);
     }
 
-    //Order the devices (DISCRETE_GPU < INTEGRATED_GPU); remove other types.
-    uint32_t descreteIdx = 0;
-    uint32_t integratedIdx = 0;
-    for (int i = 0; i < devices.size(); i++)
+    physicalDevices.swap(vector);
+
+    for (int i = 0; i < physicalDevices.size(); i++)
     {
-        switch(devices[i].properties.deviceType)
-        {
-        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-            if (devices[i].properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
-                devices.move(i, descreteIdx);
-            descreteIdx++;
-
-        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-            if (devices[i].properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
-                devices.move(i, integratedIdx);
-            integratedIdx++;
-
-            break;
-        default:
-            devices.removeAt(i--);
-        }
+        VkcDevice *device = new VkcDevice(physicalDevices[i], surface);
+        devices.append(device);
     }
+
 }
 
 
 /**
  * Create render utility objects.
  */
-void VkContext::setupRender(VkcDevice device)
+void VkcInstance::setupRender(const VkcDevice *device)
 {
     //Create uniform buffer.
-    uniformBuffer.create(16 * sizeof(float), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, device);
+    uniformBuffer = new VkcBuffer(16 * sizeof(float), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, device);
 
 
     //Fill semaphore create info.
@@ -312,8 +360,8 @@ void VkContext::setupRender(VkcDevice device)
     };
 
     //Create semaphores.
-    vkCreateSemaphore(device.logical, &semaphoreInfo, NULL, &sphAcquire);
-    vkCreateSemaphore(device.logical, &semaphoreInfo, NULL, &sphRender);
+    vkCreateSemaphore(device->logical, &semaphoreInfo, NULL, &sphAcquire);
+    vkCreateSemaphore(device->logical, &semaphoreInfo, NULL, &sphRender);
 
 
     //Fill fence create info.
@@ -325,70 +373,107 @@ void VkContext::setupRender(VkcDevice device)
     };
 
     //Create fence.
-    vkCreateFence(device.logical, &fenceInfo, NULL, &fence);
+    vkCreateFence(device->logical, &fenceInfo, NULL, &fence);
 
 
-    //Fill descriptor buffer info.
+    //Create ui image.
+    uiImage = new VkcTexture2D({width, height, 1}, device);
+
+
+    //Fill uniform buffer info.
     VkDescriptorBufferInfo uniformBufferInfo =
     {
-        uniformBuffer.handle,   //VkBuffer        buffer;
-        0,                      //VkDeviceSize    offset;
-        VK_WHOLE_SIZE           //VkDeviceSize    range;
+        uniformBuffer->handle,      //VkBuffer        buffer;
+        0,                          //VkDeviceSize    offset;
+        VK_WHOLE_SIZE               //VkDeviceSize    range;
+    };
+
+    //Fill ui image info.
+    VkDescriptorImageInfo uiImageInfo =
+    {
+        uiImage->sampler,           //VkSampler        sampler;
+        uiImage->view,              //VkImageView      imageView;
+        uiImage->layout             //VkImageLayout    imageLayout;
     };
 
     //Fill write descriptor set info.
-    VkWriteDescriptorSet writeSet =
+    VkWriteDescriptorSet writeSets[2] =
     {
-        VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                            //VkStructureType                  sType;
-        NULL,                               //const void*                      pNext;
+        {
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                                //VkStructureType                  sType;
+            NULL,                               //const void*                      pNext;
 
-        pipeline.descriptorSets[0],         //VkDescriptorSet                  dstSet;
-        0,                                  //uint32_t                         dstBinding;
-        0,                                  //uint32_t                         dstArrayElement;
-        1,                                  //uint32_t                         descriptorCount;
-        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,  //VkDescriptorType                 descriptorType;
+            pipeline->descriptorSets[0],        //VkDescriptorSet                  dstSet;
+            0,                                  //uint32_t                         dstBinding;
+            0,                                  //uint32_t                         dstArrayElement;
+            1,                                  //uint32_t                         descriptorCount;
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,  //VkDescriptorType                 descriptorType;
 
-        NULL,                               //const VkDescriptorImageInfo*     pImageInfo;
-        &uniformBufferInfo,                 //const VkDescriptorBufferInfo*    pBufferInfo;
-        NULL                                //const VkBufferView*              pTexelBufferView;
+            NULL,                               //const VkDescriptorImageInfo*     pImageInfo;
+            &uniformBufferInfo,                 //const VkDescriptorBufferInfo*    pBufferInfo;
+            NULL                                //const VkBufferView*              pTexelBufferView;
+        },
+
+        {
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                                //VkStructureType                  sType;
+            NULL,                               //const void*                      pNext;
+
+            pipeline->descriptorSets[1],        //VkDescriptorSet                  dstSet;
+            0,                                  //uint32_t                         dstBinding;
+            0,                                  //uint32_t                         dstArrayElement;
+            1,                                  //uint32_t                         descriptorCount;
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                                //VkDescriptorType                 descriptorType;
+
+            &uiImageInfo,                       //const VkDescriptorImageInfo*     pImageInfo;
+            NULL,                               //const VkDescriptorBufferInfo*    pBufferInfo;
+            NULL                                //const VkBufferView*              pTexelBufferView;
+        }
     };
 
     //Update descriptor set.
-    vkUpdateDescriptorSets(device.logical, 1, &writeSet, 0, NULL);
+    vkUpdateDescriptorSets(device->logical, 2, writeSets, 0, NULL);
 }
 
 
 /**
  * Destroy render utility objects.
  */
-void VkContext::unsetupRender(VkcDevice device)
+void VkcInstance::unsetupRender(const VkcDevice *device)
 {
     //Destroy uniform buffer.
-    uniformBuffer.destroy();
+    if (uniformBuffer != NULL)
+        delete uniformBuffer;
+
+    //Destroy ui image.
+    if (uiImage != NULL)
+        delete uiImage;
 
     //Destroy semaphores.
-    vkDestroySemaphore(device.logical, sphAcquire, NULL);
-    vkDestroySemaphore(device.logical, sphRender, NULL);
+    vkDestroySemaphore(device->logical, sphAcquire, NULL);
+    vkDestroySemaphore(device->logical, sphRender, NULL);
 
     //Destroy fence.
-    vkDestroyFence(device.logical, fence, NULL);
+    vkDestroyFence(device->logical, fence, NULL);
 }
 
 
 /**
  * Display objects to surface.
  */
-void VkContext::render(VkcDevice device, VkcSwapchain swapchain, uint32_t queueIdx, uint32_t commandBufferIdx)
+void VkcInstance::render(const VkcDevice *device, const VkcSwapchain *swapchain)
 {
-    //Get the queue and command buffer (for this thread <- to implement).
-    VkQueue activeQueue = device.queueFamilies[ACTIVE_FAMILY].queues[queueIdx];
-    VkCommandBuffer commandBuffer = device.commandBuffers[commandBufferIdx];
+    //Get the queue and command buffer.
+    ///@todo For this thread.
+    VkQueue activeQueue = device->queueFamilies[ACTIVE_FAMILY].queues[0];
+    VkCommandBuffer commandBuffer = device->queueFamilies[ACTIVE_FAMILY].commandBuffers[0];
 
     //Get the next image available.
     uint32_t nextImageIdx;
-    VkResult result = vkAcquireNextImageKHR(device.logical, swapchain.handle, UINT64_MAX, sphAcquire, fence, &nextImageIdx);
-    VkcImage nextImage = swapchain.colorImages[nextImageIdx];
+    VkResult result = vkAcquireNextImageKHR(device->logical, swapchain->handle, UINT64_MAX, sphAcquire, fence, &nextImageIdx);
+    VkcImage *nextImage = swapchain->colorImages[nextImageIdx];
 
 
     //Fill commmand buffer begin info.
@@ -405,47 +490,46 @@ void VkContext::render(VkcDevice device, VkcSwapchain swapchain, uint32_t queueI
     vkBeginCommandBuffer(commandBuffer, &commandBeginInfo);
 
     //Change image layout to color attachment optimal.
-    nextImage.changeLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, commandBuffer);
+    nextImage->changeLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, commandBuffer);
 
 
     //Fill render pass begin info.
-    VkClearValue clearValue [2] = {CLEAR_COLOR, {1.0f, 0.0f}};
     VkRenderPassBeginInfo renderPassBeginInfo =
     {
         VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,       //VkStructureType        sType;
         NULL,                                           //const void*            pNext;
 
-        swapchain.renderPass,                           //VkRenderPass           renderPass;
-        swapchain.frameBuffers[nextImageIdx],           //VkFramebuffer          framebuffer;
-        {0, 0, WIDTH, HEIGHT},                          //VkRect2D               renderArea;
+        swapchain->renderPass,                          //VkRenderPass           renderPass;
+        swapchain->frameBuffers[nextImageIdx],          //VkFramebuffer          framebuffer;
+        {0, 0, width, height},                          //VkRect2D               renderArea;
         2,                                              //uint32_t               clearValueCount;
-        clearValue                                      //const VkClearValue*    pClearValues;
+        swapchain->clearValues                          //const VkClearValue*    pClearValues;
     };
 
     //Begin render pass.
     vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     //Bind the graphics pipeline.
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.handle);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle);
 
     //Bind descriptor sets.
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0,
-                            1, &pipeline.descriptorSets[0], 0, NULL);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout, 0,
+                            2, pipeline->descriptorSets.data(), 0, NULL);
 
 
     //Get the view-projection matrix.
     QMatrix4x4 vpMatrix;
-    camera.getViewProjectionMatrix(vpMatrix);
+    camera->getViewProjectionMatrix(vpMatrix);
 
     //Render our entities.
-    square.render(commandBuffer, uniformBuffer, vpMatrix, device);
+    square->render(commandBuffer, uniformBuffer, vpMatrix, device);
 
     //End render pass.
     vkCmdEndRenderPass(commandBuffer);
 
 
     //Change image layout to present.
-    nextImage.changeLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, commandBuffer);
+    nextImage->changeLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, commandBuffer);
 
     //Stop command recording.
     vkEndCommandBuffer(commandBuffer);
@@ -473,8 +557,8 @@ void VkContext::render(VkcDevice device, VkcSwapchain swapchain, uint32_t queueI
     //Submit queue.
     vkQueueSubmit(activeQueue, 1, &submitInfo, fence);
 
-    vkWaitForFences(device.logical, 1, &fence, VK_TRUE, UINT64_MAX);
-    vkResetFences(device.logical, 1, &fence);
+    vkWaitForFences(device->logical, 1, &fence, VK_TRUE, UINT64_MAX);
+    vkResetFences(device->logical, 1, &fence);
 
     vkResetCommandBuffer(commandBuffer, 0);
 
@@ -489,7 +573,7 @@ void VkContext::render(VkcDevice device, VkcSwapchain swapchain, uint32_t queueI
         &sphRender,                         //const VkSemaphore*       pWaitSemaphores;
 
         1,                                  //uint32_t                 swapchainCount;
-        &swapchain.handle,                  //const VkSwapchainKHR*    pSwapchains;
+        &swapchain->handle,                  //const VkSwapchainKHR*    pSwapchains;
 
         &nextImageIdx,                      //const uint32_t*          pImageIndices;
         &result                             //VkResult*                pResults;
@@ -497,43 +581,4 @@ void VkContext::render(VkcDevice device, VkcSwapchain swapchain, uint32_t queueI
 
     //Now present.
     vkQueuePresentKHR(activeQueue, &presentInfo);
-}
-
-/**
- * Stot that calls the render function.
- */
-void VkContext::render()
-{
-    render(devices[ACTIVE_DEVICE], swapchain, 0, 0);
-}
-
-
-/**
- * Slot that prints the property list of all physical devices.
- */
-void VkContext::printDevices()
-{
-    //Pruint32_t properties for each device.
-    QFile file("devices.txt");
-    file.open(QIODevice::WriteOnly);
-
-    for (int i = 0; i < devices.size(); i++)
-    {
-        VkPhysicalDeviceProperties devProp = devices[i].properties;
-
-        //Interpret version data.
-        struct
-        {
-            uint32_t a, b, c;
-        } v;
-
-        v.a = VK_VERSION_MAJOR(devProp.apiVersion);
-        v.b = VK_VERSION_MINOR(devProp.apiVersion);
-        v.c = VK_VERSION_PATCH(devProp.apiVersion);
-
-        file.write(QString("Driver Version: %1\r\n").arg(devProp.driverVersion).toStdString().data());
-        file.write(QString("Device Name:    %1\r\n").arg(devProp.deviceName).toStdString().data());
-        file.write(QString("Device Type:    %1\r\n").arg((int) devProp.deviceType).toStdString().data());
-        file.write(QString("API Version:    %1.%2.%3\r\n\r\n").arg(v.a).arg(v.b).arg(v.c).toStdString().data());
-    }
 }
