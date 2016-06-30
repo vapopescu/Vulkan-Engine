@@ -98,7 +98,8 @@ VkcSwapchain::VkcSwapchain(VkSurfaceKHR surface, const VkcDevice *device) : VkcS
 
         extent,                                         //VkExtent2D                       imageExtent;
         1,                                              //uint32_t                         imageArrayLayers;
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,            //VkImageUsageFlags                imageUsage;
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |           //VkImageUsageFlags                imageUsage;
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
         VK_SHARING_MODE_EXCLUSIVE,                      //VkSharingMode                    imageSharingMode;
 
         (uint32_t)queueFamilies.count(),                //uint32_t                         queueFamilyIndexCount;

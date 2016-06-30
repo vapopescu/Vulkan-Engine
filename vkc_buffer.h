@@ -19,19 +19,19 @@ class VkcBuffer
 {
     //Objects:
 public:
-    VkBuffer            handle;
-    VkDeviceMemory      memory;
+    VkBuffer                    handle;
+    VkDeviceMemory              memory;
 
 private:
-    VkDevice            logicalDevice;
+    VkDevice                    logicalDevice;
 
     //Functions:
 public:
     VkcBuffer();
     VkcBuffer(
-            VkDeviceSize            size,
-            VkBufferUsageFlags      usageMask,
-            const VkcDevice         *device
+            VkDeviceSize        size,
+            VkBufferUsageFlags  usageMask,
+            const VkcDevice     *device
             );
 
     ~VkcBuffer();

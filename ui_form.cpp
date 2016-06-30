@@ -6,7 +6,16 @@
  */
 UiForm::UiForm(QWidget *parent) : QWidget(parent)
 {
-    updated =       false;
+    updated = false;
+}
+
+
+/**
+ * Destroys the ui form.
+ */
+UiForm::~UiForm()
+{
+
 }
 
 
@@ -36,6 +45,9 @@ GuiForm::~GuiForm()
 }
 
 
+/**
+ * Test slot.
+ */
 GuiForm::beep()
 {
     qDebug() << "beep";

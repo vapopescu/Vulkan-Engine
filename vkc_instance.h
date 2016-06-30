@@ -19,6 +19,7 @@
 #include <QWidget>
 #include <QFile>
 #include <QImage>
+#include <QPainter>
 #include <QMatrix4x4>
 #if DEBUG == 1
 #include <QDebug>
@@ -55,9 +56,11 @@ private:
     VkcSwapchain                *swapchain;
     VkcPipeline                 *pipeline;
 
-    VkcCamera                   *camera;
+
     VkcBuffer                   *uniformBuffer;
-    VkcTexture2D                *uiImage;
+    VkcBuffer                   *presentBuffer;
+    void                        *pPresentBuffer;
+    VkcCamera                   *camera;
 
     uint32_t                    width;
     uint32_t                    height;
@@ -82,11 +85,8 @@ public:
     ~VkcInstance();
 
     void render();
-    void loadUi(
-            QImage              uiImage
-            );
     void printDevices(
-            QFile               file
+            QFile               *file
             );
 
 private:

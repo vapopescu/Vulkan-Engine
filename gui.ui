@@ -17,22 +17,7 @@
    <string>Form</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">QWidget
-{
-	background-color: rgba(0x00, 0x00, 0x00, 0x00);
-}
-
-QPushButton
-{
-	background-color: rgba(0xaa, 0xaa, 0xaa, 0xff);
-}
-
-QLabel
-{
-	qproperty-alignment: left;
-	background-color: rgba(0xff, 0xff, 0xff, 0xaa);
-}
-</string>
+   <string notr="true"/>
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="2" column="0">

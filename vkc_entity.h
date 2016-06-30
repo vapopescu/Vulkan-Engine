@@ -22,12 +22,12 @@ class VkcEntity
 {
     //Objects:
 protected:
-    QVector<VkVertex>   vertices;
-    QVector<uint32_t>   indices;
+    QVector<VkVertex>           vertices;
+    QVector<uint32_t>           indices;
 
-    QMatrix4x4          modelMatrix;
+    QMatrix4x4                  modelMatrix;
 
-    VkcBuffer           *buffer;
+    VkcBuffer                   *buffer;
 
     //Functions:
 public:

@@ -9,6 +9,7 @@
 #include <vulkan.h>
 
 #include <vkc_device.h>
+#include <vkc_buffer.h>
 
 
 /**
@@ -20,41 +21,50 @@ class VkcImage
 {
     //Objects:
 public:
-    VkImage                         handle =                VK_NULL_HANDLE;
-    VkImageView                     view =                  VK_NULL_HANDLE;
-    VkSampler                       sampler =               VK_NULL_HANDLE;
+    VkImage                     handle;
+    VkImageView                 view;
+    VkSampler                   sampler;
 
-    VkImageType                     type =                  VK_IMAGE_TYPE_2D;
-    VkExtent3D                      extent =                {};
-    VkFormat                        format =                VK_FORMAT_UNDEFINED;
-    VkImageLayout                   layout =                VK_IMAGE_LAYOUT_UNDEFINED;
-    VkImageUsageFlags               usage =                 VK_IMAGE_ASPECT_COLOR_BIT;
-    VkImageSubresourceRange         resourceRange =         {};
+    VkImageType                 type;
+    VkExtent3D                  extent;
+    VkFormat                    format;
+    VkImageLayout               layout;
+    VkImageUsageFlags           usage;
+    VkImageSubresourceRange     resourceRange;
 
 protected:
-    VkBuffer                        buffer =                VK_NULL_HANDLE;
-    VkDeviceMemory                  memory =                VK_NULL_HANDLE;
-    VkDevice                        logicalDevice =         VK_NULL_HANDLE;
+    VkcBuffer                   *buffer;
+    VkDeviceMemory              memory;
+    VkDevice                    logicalDevice;
 
     //Functions:
 public:
     VkcImage();
     ~VkcImage();
 
-    void createImage(
+    void loadData(
+            QImage              image,
             const VkcDevice     *device
             );
-    void createView();
-    void createSampler();
-
+    void getData(
+            VkcBuffer           *buffer,
+            VkCommandBuffer     commandBuffer
+            );
     void changeLayout(
             VkImageLayout       oldLayout,
             VkImageLayout       newLayout,
             VkCommandBuffer     commandBuffer
             );
-    void loadData(
-            QImage uiImage
+
+protected:
+    void createImage(
+            const VkcDevice     *device
             );
+    void prepareImage(
+            const VkcDevice     *device
+            );
+    void createView();
+    void createSampler();
 
 private:
     void getAccessMask(
@@ -74,7 +84,6 @@ public:
     {
         type =              VK_IMAGE_TYPE_2D;
         layout =            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        usage =             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
         resourceRange = {
             VK_IMAGE_ASPECT_COLOR_BIT,      //VkImageAspectFlags    aspectMask;
@@ -86,16 +95,16 @@ public:
     }
 
     VkcColorImage(
-            VkImage         handle,
-            VkExtent3D      extent,
-            VkFormat        format,
-            VkDevice        logicalDevice
+            VkImage             handle,
+            VkExtent3D          extent,
+            VkFormat            format,
+            VkDevice            logicalDevice
             ) : VkcColorImage()
     {
-        this->handle = handle;
-        this->extent = extent;
-        this->format = format;
-        this->logicalDevice = logicalDevice;
+        this->handle =          handle;
+        this->extent =          extent;
+        this->format =          format;
+        this->logicalDevice =   logicalDevice;
 
         createView();
     }
@@ -127,10 +136,11 @@ public:
 
     VkcDepthImage(VkExtent3D extent, const VkcDevice *device) : VkcDepthImage()
     {
-        this->extent = extent;
-        this->logicalDevice = device->logical;
+        this->extent =      extent;
+        logicalDevice =     device->logical;
 
         createImage(device);
+        prepareImage(device);
         createView();
     }
 };
@@ -147,7 +157,10 @@ public:
         type =              VK_IMAGE_TYPE_2D;
         format =            VK_FORMAT_R8G8B8A8_UNORM;
         layout =            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        usage =             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        usage =             0 |
+                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                VK_IMAGE_USAGE_SAMPLED_BIT;
 
         resourceRange = {
             VK_IMAGE_ASPECT_COLOR_BIT,      //VkImageAspectFlags    aspectMask;
@@ -158,16 +171,19 @@ public:
         };
     }
 
-    VkcTexture2D(VkExtent3D extent, const VkcDevice *device) : VkcTexture2D()
+    VkcTexture2D(QImage image, const VkcDevice *device) : VkcTexture2D()
     {
-        this->extent = extent;
-        this->logicalDevice = device->logical;
+        extent.width =      image.width();
+        extent.height =     image.height();
+        extent.depth =      1;
+        logicalDevice =     device->logical;
 
+        loadData(image, device);
         createImage(device);
+        prepareImage(device);
         createView();
         createSampler();
     }
 };
-
 
 #endif // VKC_IMAGE_H

@@ -49,7 +49,7 @@ DISTFILES += \
 QMAKE_CXXFLAGS += \
     -Wno-pointer-arith
 
-VK_SDK = "C:/Program Files/VulkanSDK 1.0.13.0"
+VK_SDK = "C:/VulkanSDK/1.0.17.0"
 
 INCLUDEPATH +=          $$VK_SDK/Include/vulkan
 

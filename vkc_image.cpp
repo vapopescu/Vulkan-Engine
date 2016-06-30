@@ -41,6 +41,9 @@ VkcImage::~VkcImage()
             memory = VK_NULL_HANDLE;
         }
 
+        if (buffer != NULL)
+            delete buffer;
+
         if (handle != VK_NULL_HANDLE)
         {
             vkDestroyImage(logicalDevice, handle, NULL);
@@ -49,6 +52,113 @@ VkcImage::~VkcImage()
 
         logicalDevice = VK_NULL_HANDLE;
     }
+}
+
+
+/**
+ * Load data into the image buffer.
+ */
+void VkcImage::loadData(QImage image, const VkcDevice *device)
+{
+    //If image buffer exists, destroy it.
+    if (buffer != NULL)
+        delete buffer;
+
+    //Create image buffer.
+    uint32_t size = extent.width * extent.height * 4;
+    buffer = new VkcBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, device);
+
+    //Map buffer memory to host.
+    void *data;
+    vkMapMemory(device->logical, buffer->memory, 0, VK_WHOLE_SIZE, 0, &data);
+
+    //Copy data to the buffer.
+    memcpy(data, image.bits(), image.byteCount());
+
+    //Unmap memory.
+    vkUnmapMemory(device->logical, buffer->memory);
+
+    //If image is not at creation, prepare it.
+    if (handle != NULL)
+        prepareImage(device);
+}
+
+
+/**
+ * Record commands for copying image data to buffer.
+ */
+void VkcImage::getData(VkcBuffer *buffer, VkCommandBuffer commandBuffer)
+{
+    //Change image layout to transfer source.
+    changeLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, commandBuffer);
+
+    //Fill resource layer info.
+    VkImageSubresourceLayers resourceLayer =
+    {
+        resourceRange.aspectMask,       //VkImageAspectFlags    aspectMask;
+        resourceRange.baseMipLevel,     //uint32_t              mipLevel;
+        resourceRange.baseArrayLayer,   //uint32_t              baseArrayLayer;
+        resourceRange.layerCount        //uint32_t              layerCount;
+    };
+
+    //Fill image copy info.
+    VkBufferImageCopy region =
+    {
+        0,                              //VkDeviceSize                bufferOffset;
+        extent.width,                   //uint32_t                    bufferRowLength;
+        extent.height,                  //uint32_t                    bufferImageHeight;
+
+        resourceLayer,                  //VkImageSubresourceLayers    imageSubresource;
+        {0, 0, 0},                      //VkOffset3D                  imageOffset;
+        extent                          //VkExtent3D                  imageExtent;
+    };
+
+    //Copy from image to buffer.
+    vkCmdCopyImageToBuffer(commandBuffer, handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer->handle, 1, &region);
+}
+
+
+/**
+ * Registers the commands to change image layout.
+ */
+void VkcImage::changeLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer commandBuffer)
+{
+    //Setup access masks.
+    VkAccessFlags srcAccessMask;
+    VkAccessFlags dstAccessMask;
+
+    getAccessMask(srcAccessMask, oldLayout);
+    getAccessMask(dstAccessMask, newLayout);
+
+    //Setup image barrier.
+    VkImageMemoryBarrier imageBarrier =
+    {
+        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, //VkStructureType            sType;
+        NULL,                                   //const void*                pNext;
+
+        srcAccessMask,                          //VkAccessFlags              srcAccessMask;
+        dstAccessMask,                          //VkAccessFlags              dstAccessMask;
+
+        oldLayout,                              //VkImageLayout              oldLayout;
+        newLayout,                              //VkImageLayout              newLayout;
+
+        VK_QUEUE_FAMILY_IGNORED,                //uint32_t                   srcQueueFamilyIndex;
+        VK_QUEUE_FAMILY_IGNORED,                //uint32_t                   dstQueueFamilyIndex;
+
+        handle,                                 //VkImage                    image;
+        resourceRange                           //VkImageSubresourceRange    subresourceRange;
+    };
+
+    //Register barrier in command buffer.
+    vkCmdPipelineBarrier(
+                commandBuffer,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                0,
+                0, NULL,
+                0, NULL,
+                1, &imageBarrier
+                );
 }
 
 
@@ -89,7 +199,6 @@ void VkcImage::createImage(const VkcDevice *device)
     //Create image.
     vkCreateImage(device->logical, &imageInfo, NULL, &handle);
 
-
     //Get image memory requirements.
     VkMemoryRequirements memoryRequirements;
     vkGetImageMemoryRequirements(device->logical, handle, &memoryRequirements);
@@ -114,9 +223,15 @@ void VkcImage::createImage(const VkcDevice *device)
 
     //Bind memory to image.
     vkBindImageMemory(device->logical, handle, memory, 0);
+}
 
 
-    //Fill fence create info.
+/**
+ * Change image layout to optimal and load data.
+ */
+void VkcImage::prepareImage(const VkcDevice *device)
+{
+    //Fill fence info.
     VkFenceCreateInfo fenceInfo =
     {
         VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,    //VkStructureType           sType;
@@ -128,6 +243,7 @@ void VkcImage::createImage(const VkcDevice *device)
     VkFence fence;
     vkCreateFence(device->logical, &fenceInfo, NULL, &fence);
 
+    //Get active queue and command buffer.
     VkQueue activeQueue = device->queueFamilies[ACTIVE_FAMILY].queues[0];
     VkCommandBuffer commandBuffer = device->queueFamilies[ACTIVE_FAMILY].commandBuffers[0];
 
@@ -143,6 +259,37 @@ void VkcImage::createImage(const VkcDevice *device)
 
     //Begin command recording.
     vkBeginCommandBuffer(commandBuffer, &commandBeginInfo);
+
+    //If image data exists, load it.
+    if(buffer != NULL)
+    {
+        //Change image layout to transfer destination.
+        changeLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, commandBuffer);
+
+        //Fill resource layer info.
+        VkImageSubresourceLayers resourceLayer =
+        {
+            resourceRange.aspectMask,       //VkImageAspectFlags    aspectMask;
+            resourceRange.baseMipLevel,     //uint32_t              mipLevel;
+            resourceRange.baseArrayLayer,   //uint32_t              baseArrayLayer;
+            resourceRange.layerCount        //uint32_t              layerCount;
+        };
+
+        //Fill image copy info.
+        VkBufferImageCopy region =
+        {
+            0,                              //VkDeviceSize                bufferOffset;
+            extent.width,                   //uint32_t                    bufferRowLength;
+            extent.height,                  //uint32_t                    bufferImageHeight;
+
+            resourceLayer,                  //VkImageSubresourceLayers    imageSubresource;
+            {0, 0, 0},                      //VkOffset3D                  imageOffset;
+            extent                          //VkExtent3D                  imageExtent;
+        };
+
+        //Copy from data buffer to image.
+        vkCmdCopyBufferToImage(commandBuffer, buffer->handle, handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    }
 
     //Change image layout to optimal.
     changeLayout(VK_IMAGE_LAYOUT_UNDEFINED, layout, commandBuffer);
@@ -179,6 +326,7 @@ void VkcImage::createImage(const VkcDevice *device)
 
     //Destroy the fence.
     vkDestroyFence(device->logical, fence, NULL);
+
 }
 
 
@@ -246,60 +394,6 @@ void VkcImage::createSampler()
 
 
 /**
- * Registers the commands to change image layout.
- */
-void VkcImage::changeLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer commandBuffer)
-{
-    //Setup access masks.
-    VkAccessFlags srcAccessMask;
-    VkAccessFlags dstAccessMask;
-
-    getAccessMask(srcAccessMask, oldLayout);
-    getAccessMask(dstAccessMask, newLayout);
-
-    //Setup image barrier.
-    VkImageMemoryBarrier imageBarrier =
-    {
-        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, //VkStructureType            sType;
-        NULL,                                   //const void*                pNext;
-
-        srcAccessMask,                          //VkAccessFlags              srcAccessMask;
-        dstAccessMask,                          //VkAccessFlags              dstAccessMask;
-
-        oldLayout,                              //VkImageLayout              oldLayout;
-        newLayout,                              //VkImageLayout              newLayout;
-
-        VK_QUEUE_FAMILY_IGNORED,                //uint32_t                   srcQueueFamilyIndex;
-        VK_QUEUE_FAMILY_IGNORED,                //uint32_t                   dstQueueFamilyIndex;
-
-        handle,                                 //VkImage                    image;
-        resourceRange                           //VkImageSubresourceRange    subresourceRange;
-    };
-
-    //Register barrier in command buffer.
-    vkCmdPipelineBarrier(
-                commandBuffer,
-                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                0,
-                0, NULL,
-                0, NULL,
-                1, &imageBarrier
-                );
-}
-
-
-/**
- * Load data into the image buffer.
- */
-void VkcImage::loadData(QImage uiImage)
-{
-    ///@todo
-    (void)uiImage;
-}
-
-
-/**
  * Get the access mask specific to the image layout.
  */
 void VkcImage::getAccessMask(VkAccessFlags &accessMask, VkImageLayout layout)
@@ -328,6 +422,11 @@ void VkcImage::getAccessMask(VkAccessFlags &accessMask, VkImageLayout layout)
         accessMask =
                 VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
                 VK_ACCESS_MEMORY_READ_BIT;
+        break;
+
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+        accessMask =
+                VK_ACCESS_TRANSFER_READ_BIT;
         break;
 
     case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:

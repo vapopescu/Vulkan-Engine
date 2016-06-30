@@ -17,9 +17,7 @@ AppWindow::AppWindow(QWidget *parent) :
 
     //Setup gui form.
     guiForm = new GuiForm(ui->mainWidget);
-    guiForm->setAttribute(Qt::WA_DontShowOnScreen);
-    guiForm->show();
-    drawUi = false;
+    guiForm->hide();
 
     //Set resolution.
     this->setFixedSize(1600, 900);
@@ -27,7 +25,9 @@ AppWindow::AppWindow(QWidget *parent) :
     guiForm->   setGeometry(0, 0, this->width(), this->height());
 
     //Initialize Vulkan.
-    vkcInstance = new VkcInstance(vkWidget);
+    vkcInstance = new VkcInstance(this);
+    vkcInstance->printDevices(new QFile("devices.txt"));
+    //vkWidget->hide();
 
     //Initialize fps timer.
     fpsTimer = new QTimer(this);
@@ -59,78 +59,10 @@ AppWindow::~AppWindow()
 
 bool AppWindow::eventFilter(QObject *obj, QEvent *event)
 {
-    QChildEvent     *childEvent;
-    QMouseEvent     *mouseEvent;
-
-    QWidget         *widget;
-    QPoint          pos;
-
     switch (event->type())
     {
     case QEvent::User:
         loop();
-        return true;
-
-    case QEvent::ChildAdded:
-        childEvent = (QChildEvent*)event;
-        childEvent->child()->installEventFilter(this);
-        return true;
-
-    case QEvent::ChildRemoved:
-        childEvent = (QChildEvent*)event;
-        childEvent->child()->removeEventFilter(this);
-        return true;
-
-    case QEvent::Paint:
-        if (UiForm *uiForm = qobject_cast<UiForm*>(obj))
-        {
-            if (drawUi)
-            {
-                uiForm->updated = false;
-                return false;
-            }
-            uiForm->updated = true;
-        }
-        return !drawUi;
-
-    case QEvent::MouseButtonPress:
-    case QEvent::MouseButtonRelease:
-    case QEvent::MouseButtonDblClick:
-    case QEvent::MouseMove:
-        mouseEvent = (QMouseEvent*) event;
-        pos = mouseEvent->windowPos().toPoint();
-        widget = ui->mainWidget->childAt(pos);
-
-        if (obj == vkWidget)
-        {
-            QEvent  *e = new QEvent(event->type());
-
-            if (widget != NULL)
-                QCoreApplication::sendEvent(widget, e);
-
-            return true;
-        }
-        if (QPushButton *button = qobject_cast<QPushButton*>(obj))
-        {
-            if (mouseEvent->type() == QEvent::MouseButtonRelease)
-                button->click();
-            return true;
-        }
-        else
-            return false;
-
-    case QEvent::Enter:
-        if (QWidget *widget = qobject_cast<QWidget*>(obj))
-        {
-            widget->setAttribute(Qt::WA_UnderMouse, true);
-        }
-        return true;
-
-    case QEvent::Leave:
-        if (QWidget *widget = qobject_cast<QWidget*>(obj))
-        {
-            widget->setAttribute(Qt::WA_UnderMouse, false);
-        }
         return true;
 
     default:
@@ -144,18 +76,6 @@ bool AppWindow::eventFilter(QObject *obj, QEvent *event)
  */
 void AppWindow::loop()
 {
-    //Render GUI.
-    QImage uiImage(size(), QImage::Format_ARGB32);
-    if(guiForm->updated)
-    {
-        drawUi = true;
-        guiForm->render(&uiImage, QPoint(), QRegion(), QWidget::DrawChildren);
-        drawUi = false;
-
-        vkcInstance->loadUi(uiImage);
-        //uiImage.save("gui.png");
-    }
-
     //Main render.
     vkcInstance->render();
     guiForm->frameCount++;

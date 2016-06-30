@@ -16,8 +16,8 @@ class VkcCamera
 {
     //Objects:
 private:
-    QMatrix4x4      viewMatrix;
-    QMatrix4x4      projectionMatrix;
+    QMatrix4x4              viewMatrix;
+    QMatrix4x4              projectionMatrix;
 
     //Functions:
 public:
@@ -25,10 +25,10 @@ public:
     ~VkcCamera();
 
     void setProjectionMatrix(
-            float verticalAngle,
-            float aspectRatio,
-            float nearPlane,
-            float farPlane
+            float           verticalAngle,
+            float           aspectRatio,
+            float           nearPlane,
+            float           farPlane
             );
 
     void getViewProjectionMatrix(

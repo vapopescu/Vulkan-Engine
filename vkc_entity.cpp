@@ -32,7 +32,7 @@ VkcEntity::VkcEntity(const VkcDevice *device) : VkcEntity()
                   VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, device);
 
     //Map buffer memory to host.
-    void *data = NULL;
+    void *data;
     vkMapMemory(device->logical, buffer->memory, 0, VK_WHOLE_SIZE, 0, &data);
 
     //Copy data to the buffer.

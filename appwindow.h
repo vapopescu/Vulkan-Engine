@@ -50,7 +50,6 @@ private:
     VkcInstance     *vkcInstance;
     QWidget         *vkWidget;
 
-    bool            drawUi;
     GuiForm         *guiForm;
 
     QTimer          *fpsTimer;
@@ -59,6 +58,5 @@ private:
 protected:
     bool eventFilter(QObject *obj, QEvent *event);
 };
-
 
 #endif // APPWINDOW_H

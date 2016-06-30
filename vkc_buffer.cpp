@@ -43,7 +43,7 @@ VkcBuffer::VkcBuffer(VkDeviceSize size, VkBufferUsageFlags usageMask, const VkcD
     vkGetBufferMemoryRequirements(device->logical, handle, &memoryRequirements);
 
     uint32_t memoryTypeIdx = 0;
-    VkMemoryPropertyFlags memoryMask = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+    VkMemoryPropertyFlags memoryMask = VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
     device->getMemoryTypeIndex(memoryTypeIdx, memoryMask, memoryRequirements);
 
     //Fill buffer memory allocate info.

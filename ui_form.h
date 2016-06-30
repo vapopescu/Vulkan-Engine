@@ -2,6 +2,7 @@
 #define UI_FORM_H
 
 #include <QWidget>
+#include <QImage>
 #include <QDebug>
 
 #include "ui_gui.h"
@@ -16,12 +17,13 @@ class UiForm : public QWidget
 
     //Objects:
 public:
-    bool    updated;
+    bool        updated;
+    QImage      uiImage;
 
     //Functions:
 public:
     UiForm(QWidget *parent = 0);
-    ~UiForm(){}
+    ~UiForm();
 };
 
 
