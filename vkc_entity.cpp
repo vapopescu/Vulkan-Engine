@@ -6,7 +6,11 @@
  */
 VkcEntity::VkcEntity()
 {
+    position =  QVector3D(0.0f, 0.0f, 0.0f);
+    scale =     QVector3D(1.0f, 1.0f, 1.0f);
+    rotation =  QQuaternion(1.0f, 0.0f, 0.0f, 0.0f);
 
+    dir = 0.1f / 15.0f;
 }
 
 
@@ -15,35 +19,34 @@ VkcEntity::VkcEntity()
  */
 VkcEntity::VkcEntity(const VkcDevice *device) : VkcEntity()
 {
-    //Load the model.
-    vertices.append({-1.0f,  1.0f,  0.0f,    0.0f,  1.0f,    0.0f,  0.0f, -1.0f});
-    vertices.append({ 1.0f,  1.0f,  0.0f,    1.0f,  1.0f,    0.0f,  0.0f, -1.0f});
-    vertices.append({ 1.0f, -1.0f,  0.0f,    1.0f,  0.0f,    0.0f,  0.0f, -1.0f});
-    vertices.append({-1.0f, -1.0f,  0.0f,    0.0f,  0.0f,    0.0f,  0.0f, -1.0f});
+    // Load the model.
+    vertices.append({-1.0f,  0.0f,  1.0f,    0.0f,  1.0f,    0.0f, -1.0f,  0.0f});
+    vertices.append({-1.0f,  0.0f, -1.0f,    0.0f,  0.0f,    0.0f, -1.0f,  0.0f});
+    vertices.append({ 1.0f,  0.0f,  1.0f,    1.0f,  1.0f,    0.0f, -1.0f,  0.0f});
+    vertices.append({ 1.0f,  0.0f, -1.0f,    1.0f,  0.0f,    0.0f, -1.0f,  0.0f});
 
-    indices = {0, 1, 2, 0, 2, 3};
+    indices = {0, 1, 2, 2, 1, 3};
 
-    //Move entity.
-    modelMatrix.translate(0.0f, 0.0f, 1.5f);
+    // Load position, scale and rotation data.
+    // /@todo
 
-
-    //Create buffer.
-    buffer = new VkcBuffer(vertices.size() * sizeof(VkVertex) + indices.size() * sizeof(uint32_t),
+    // Create buffer.
+    buffer.create(vertices.size() * sizeof(VkVertex) + indices.size() * sizeof(uint32_t),
                   VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, device);
 
-    //Map buffer memory to host.
-    void *data;
-    vkMapMemory(device->logical, buffer->memory, 0, VK_WHOLE_SIZE, 0, &data);
+    // Map buffer memory to host.
+    uint8_t *data;
+    vkMapMemory(device->logical, buffer.memory, 0, VK_WHOLE_SIZE, 0,(void**) &data);
 
-    //Copy data to the buffer.
+    // Copy data to the buffer.
     uint32_t offset = 0;
     memcpy(data + offset, vertices.data(), vertices.size() * sizeof(VkVertex));
 
     offset += vertices.size() * sizeof(VkVertex);
     memcpy(data + offset, indices.data(), indices.size() * sizeof(uint32_t));
 
-    //Unmap memory.
-    vkUnmapMemory(device->logical, buffer->memory);
+    // Unmap memory.
+    vkUnmapMemory(device->logical, buffer.memory);
 }
 
 
@@ -52,39 +55,49 @@ VkcEntity::VkcEntity(const VkcDevice *device) : VkcEntity()
  */
 VkcEntity::~VkcEntity()
 {
-    if (buffer != NULL)
-        delete buffer;
+    buffer.destroy();
 }
 
 
 /**
  * Register the commands that render the entity.
  */
-void VkcEntity::render(VkCommandBuffer commandBuffer, const VkcBuffer *uniformBuffer, QMatrix4x4 vpMatrix, const VkcDevice *device)
+void VkcEntity::render(VkCommandBuffer commandBuffer, MgBuffer uniformBuffer, QMatrix4x4 vpMatrix, const VkcDevice *device)
 {
-    //Calculate MVP matrix.
+    // Wiggle, wiggle, wiggle.
+    position += QVector3D(dir, 0.0f, 0.0f);
+    float pos = position.x();
+
+    if(pos > 0.1f || pos < -0.1f)
+        dir *= -1.0f;
+
+    // Calculate model matrix.
+    QMatrix4x4 modelMatrix;
+    modelMatrix.translate(position);
+    modelMatrix.rotate(rotation);
+    modelMatrix.scale(scale);
+
+    // Calculate MVP matrix.
     QMatrix4x4 mvpMatrix = vpMatrix * modelMatrix;
 
-    //Map uniform buffer memory to host.
-    void *data = NULL;
-    vkMapMemory(device->logical, uniformBuffer->memory, 0, VK_WHOLE_SIZE, 0, &data);
+    // Map uniform buffer memory to host.
+    void *data = nullptr;
+    vkMapMemory(device->logical, uniformBuffer.memory, 0, VK_WHOLE_SIZE, 0, &data);
 
-    //Copy data to the buffer.
+    // Copy data to the buffer.
     memcpy(data, mvpMatrix.data(), 16 * sizeof(float));
 
-    //Unmap memory.
-    vkUnmapMemory(device->logical, uniformBuffer->memory);
+    // Unmap memory.
+    vkUnmapMemory(device->logical, uniformBuffer.memory);
 
-
-    //Bind vertex and index bufffer.
+    // Bind vertex and index bufffer.
     VkDeviceSize vboOffsets[] = {0};
     uint32_t iboOffset = vertices.size() * sizeof(VkVertex);
 
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &buffer->handle, vboOffsets);
-    vkCmdBindIndexBuffer(commandBuffer, buffer->handle, iboOffset, VK_INDEX_TYPE_UINT32);
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &buffer.handle, vboOffsets);
+    vkCmdBindIndexBuffer(commandBuffer, buffer.handle, iboOffset, VK_INDEX_TYPE_UINT32);
 
-
-    //Draw entity.
+    // Draw entity.
     vkCmdDrawIndexed(commandBuffer, indices.size(), 1, 0, 0, 0);
 }
 

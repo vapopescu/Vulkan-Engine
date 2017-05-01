@@ -1,28 +1,26 @@
-#ifndef VKC_CAMERA_H
-#define VKC_CAMERA_H
+#ifndef MGCAMERA_H
+#define MGCAMERA_H
 
-#include <QtMath>
-#include <QMatrix4x4>
-#if DEBUG == 1
-#include <QDebug>
-#endif
+#include "stable.h"
+
 
 /**
  * Class used for managing view and projection matrices.
- *
- * Classes named "Vkc[class]" stand for "Vulkan custom class".
  */
-class VkcCamera
+class MgCamera
 {
-    //Objects:
+    // Objects:
 private:
-    QMatrix4x4              viewMatrix;
     QMatrix4x4              projectionMatrix;
 
-    //Functions:
+    QMatrix4x4              axisMatrix;
+    QVector3D               position;
+    QQuaternion             rotation;
+
+    // Functions:
 public:
-    VkcCamera();
-    ~VkcCamera();
+    MgCamera();
+    ~MgCamera();
 
     void setProjectionMatrix(
             float           verticalAngle,
@@ -32,8 +30,8 @@ public:
             );
 
     void getViewProjectionMatrix(
-            QMatrix4x4      &vpMatrix
+            QMatrix4x4*     pVPMatrix
             );
 };
 
-#endif // VKC_CAMERA_H
+#endif // MGCAMERA_H

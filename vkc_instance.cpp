@@ -1,5 +1,12 @@
 #include "vkc_instance.h"
 
+#define NV_VERSION_MAJOR(version) ((uint32_t)(version) >> 22)
+#define NV_VERSION_MINOR(version) (((uint32_t)(version) >> 14) & 0xff)
+#define NV_VERSION_PATCH(version) ((uint32_t)(version) & 0x3ff)
+
+#define AMD_VERSION_MAJOR(version) ((uint32_t)(version) >> 18)
+#define AMD_VERSION_MINOR(version) (((uint32_t)(version) >> 12) & 0x3f)
+#define AMD_VERSION_PATCH(version) ((uint32_t)(version) & 0x1ff)
 
 /**
  * Initialize the vulkan context.
@@ -7,21 +14,21 @@
 VkcInstance::VkcInstance(QWidget *parent) : QObject(parent)
 {
     createInstance();
-    createSurface((uint32_t)parent->winId());
     getDevices();
 
-    swapchain = new VkcSwapchain(surface, devices[ACTIVE_DEVICE]);
-    pipeline = new VkcPipeline(swapchain, devices[ACTIVE_DEVICE]);
+    context = new VkcContext((uint32_t)parent->winId(), devices[0], instance);
 
-    square = new VkcEntity(devices[ACTIVE_DEVICE]);
+    square = new VkcEntity(devices[0]);
+
+    tux.create(devices[0], "data/textures/tux.png");
 
     width =     parent->width();
     height =    parent->height();
 
-    camera = new VkcCamera();
-    camera->setProjectionMatrix(3.14159 / 2, (float)width / (float)height, 1, 100);
+    camera = new MgCamera();
+    camera->setProjectionMatrix(3.14159f / 2, (float)width / (float)height, 1, 100);
 
-    setupRender(devices[ACTIVE_DEVICE]);
+    setupRender(devices[0]);
 }
 
 
@@ -30,83 +37,36 @@ VkcInstance::VkcInstance(QWidget *parent) : QObject(parent)
  */
 VkcInstance::~VkcInstance()
 {
-    if (square != NULL)
+    if (square != nullptr)
         delete square;
 
-    if (camera != NULL)
+    tux.destroy(devices[0]);
+
+    if (camera != nullptr)
         delete camera;
 
-    unsetupRender(devices[ACTIVE_DEVICE]);
+    unsetupRender(devices[0]);
 
-    if (pipeline != NULL)
-    delete pipeline;
-
-    if (swapchain != NULL)
-    delete swapchain;
+    if (context != nullptr)
+        delete context;
 
     for (int i = 0; i < devices.size(); i++)
         delete devices[i];
 
-    if (surface != VK_NULL_HANDLE)
-        vkDestroySurfaceKHR(instance, surface, NULL);
-
-#if DEBUG == 1
+#ifdef QT_DEBUG
     if (debugReport != VK_NULL_HANDLE)
-        pfDestroyDebugReportCallbackEXT(instance, debugReport, NULL);
+        pfDestroyDebugReportCallbackEXT(instance, debugReport, nullptr);
 #endif
 
-    if (instance != NULL)
-        vkDestroyInstance(instance, NULL);
-}
-
-
-/**
- * Call render (@todo on all contexts).
- */
-void VkcInstance::render()
-{
-    render(devices[ACTIVE_DEVICE], swapchain);
-}
-
-
-/**
- * Print the property list of all physical devices.
- */
-void VkcInstance::printDevices(QFile *file)
-{
-    file->open(QIODevice::WriteOnly);
-
-    for (int i = 0; i < devices.size(); i++)
-    {
-        VkPhysicalDeviceProperties devProp = devices[i]->properties;
-
-        //Interpret version data.
-        struct
-        {
-            uint32_t a, b, c;
-        } api, drv;
-
-        api.a = VK_VERSION_MAJOR(devProp.apiVersion);
-        api.b = VK_VERSION_MINOR(devProp.apiVersion);
-        api.c = VK_VERSION_PATCH(devProp.apiVersion);
-
-        drv.a = VK_VERSION_MAJOR(devProp.driverVersion);
-        drv.b = VK_VERSION_MINOR(devProp.driverVersion) >> 2;
-
-        file->write(QString("Device Name:       %1\r\n").arg(devProp.deviceName).toStdString().data());
-        file->write(QString("Device Type:       %1\r\n").arg((int) devProp.deviceType).toStdString().data());
-        file->write(QString("Driver Version:    %1.%2\r\n").arg(drv.a).arg(drv.b).toStdString().data());
-        file->write(QString("API Version:       %1.%2.%3\r\n\r\n").arg(api.a).arg(api.b).arg(api.c).toStdString().data());
-    }
-
-    file->close();
+    if (instance != nullptr)
+        vkDestroyInstance(instance, nullptr);
 }
 
 
 /**
   * Used by the Vulkan debug layer.
   */
-#if DEBUG == 1
+#ifdef QT_DEBUG
 VKAPI_ATTR VkBool32 VKAPI_CALL vkDebugCallback(
         VkDebugReportFlagsEXT                       flags,
         VkDebugReportObjectTypeEXT                  objectType,
@@ -150,152 +110,90 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vkDebugCallback(
  */
 void VkcInstance::createInstance()
 {
-    //Fill application info.
+    // Fill application info.
     VkApplicationInfo applicationInfo =
     {
-        VK_STRUCTURE_TYPE_APPLICATION_INFO,     //VkStructureType    sType;
-        NULL,                                   //const void*        pNext;
+        VK_STRUCTURE_TYPE_APPLICATION_INFO,         // VkStructureType    sType;
+        nullptr,                                       // const void*        pNext;
 
-        "Vulkan Engine",                        //const char*        pApplicationName;
-        VK_MAKE_VERSION(0, 10, 0),              //uint32_t           applicationVersion;
+        "Magma Engine Demo",                        // const char*        pApplicationName;
+        VK_MAKE_VERSION(0, 10, 0),                  // uint32_t           applicationVersion;
 
-        "vkEngine",                             //const char*        pEngineName;
-        VK_MAKE_VERSION(0, 10, 0),              //uint32_t           engineVersion;
+        "Magma Engine",                             // const char*        pEngineName;
+        VK_MAKE_VERSION(0, 10, 0),                  // uint32_t           engineVersion;
 
-        VK_MAKE_VERSION(1, 0, 8)                //uint32_t           apiVersion;
+        VK_MAKE_VERSION(1, 0, VK_HEADER_VERSION)    // uint32_t           apiVersion;
     } ;
 
-    //Setup instance layers and extentions.
+    // Setup instance layers and extentions.
     static QVector<const char*> instanceLayers =
     {
-        #if DEBUG == 1
+#ifdef QT_DEBUG
         "VK_LAYER_LUNARG_standard_validation"
-        #endif
+#endif
     };
 
     static QVector<const char*> instanceExtentions =
     {
         VK_KHR_SURFACE_EXTENSION_NAME,
+        VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
 
-        #if DEBUG == 1
-        VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
-        #endif
-
-        #ifdef _WIN32
-        VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-
-        #elif __ANDROID__
-        VK_KHR_ANDROID_SURFACE_EXTENSION_NAME
-
-        #else
-        VK_KHR_XCB_SURFACE_EXTENSION_NAME;
-        #endif
+#ifdef QT_DEBUG
+        VK_EXT_DEBUG_REPORT_EXTENSION_NAME
+#endif
     };
 
-#if DEBUG == 1
-    //Fill debug report callback info.
+#ifdef QT_DEBUG
+    // Fill debug report callback info.
     VkDebugReportCallbackCreateInfoEXT  debugReportInfo =
     {
-        VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,    //VkStructureType                 sType;
-        NULL,                                                       //const void*                     pNext;
-        0 |                                                         //VkDebugReportFlagsEXT           flags;
-        //VK_DEBUG_REPORT_INFORMATION_BIT_EXT |
+        VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,    // VkStructureType                 sType;
+        nullptr,                                                       // const void*                     pNext;
+        0 |                                                         // VkDebugReportFlagsEXT           flags;
+        // VK_DEBUG_REPORT_INFORMATION_BIT_EXT |
         VK_DEBUG_REPORT_WARNING_BIT_EXT |
         VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
         VK_DEBUG_REPORT_ERROR_BIT_EXT |
-        //VK_DEBUG_REPORT_DEBUG_BIT_EXT |
+        // VK_DEBUG_REPORT_DEBUG_BIT_EXT |
         0,
 
-        (PFN_vkDebugReportCallbackEXT)vkDebugCallback,              //PFN_vkDebugReportCallbackEXT    pfnCallback;
-        NULL                                                        //void*                           pUserData;
+        (PFN_vkDebugReportCallbackEXT)vkDebugCallback,              // PFN_vkDebugReportCallbackEXT    pfnCallback;
+        nullptr                                                        // void*                           pUserData;
     };
 
     void *pDebugReportInfo = &debugReportInfo;
 #else
-    void *pDebugReportInfo = NULL;
+    void *pDebugReportInfo = nullptr;
 #endif
 
-    //Fill instance info.
+    // Fill instance info.
     VkInstanceCreateInfo instanceInfo =
     {
-        VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,     //VkStructureType             sType;
-        pDebugReportInfo,                           //const void*                 pNext;
-        0,                                          //VkInstanceCreateFlags       flags;
+        VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,     // VkStructureType             sType;
+        pDebugReportInfo,                           // const void*                 pNext;
+        0,                                          // VkInstanceCreateFlags       flags;
 
-        &applicationInfo,                           //const VkApplicationInfo*    pApplicationInfo;
+        &applicationInfo,                           // const VkApplicationInfo*    pApplicationInfo;
 
-        (uint32_t)instanceLayers.size(),            //uint32_t                    enabledLayerCount;
-        instanceLayers.data(),                      //const char* const*          ppEnabledLayerNames;
+        (uint32_t)instanceLayers.size(),            // uint32_t                    enabledLayerCount;
+        instanceLayers.data(),                      // const char* const*          ppEnabledLayerNames;
 
-        (uint32_t)instanceExtentions.size(),        //uint32_t                    enabledExtensionCount;
-        instanceExtentions.data(),                  //const char* const*          ppEnabledExtensionNames;
+        (uint32_t)instanceExtentions.size(),        // uint32_t                    enabledExtensionCount;
+        instanceExtentions.data(),                  // const char* const*          ppEnabledExtensionNames;
     };
 
-    //Create instance.
-    vkCreateInstance(&instanceInfo, NULL, &instance);
+    // Create instance.
+    vkCreateInstance(&instanceInfo, nullptr, &instance);
 
-#if DEBUG == 1
-    //Get function pointers.
+#ifdef QT_DEBUG
+    // Get function pointers.
     GET_IPROC(instance, CreateDebugReportCallbackEXT);
     GET_IPROC(instance, DestroyDebugReportCallbackEXT);
 
-    //Create the debug report callback.
-    pfCreateDebugReportCallbackEXT(instance, &debugReportInfo, NULL, &debugReport);
+    // Create the debug report callback.
+    pfCreateDebugReportCallbackEXT(instance, &debugReportInfo, nullptr, &debugReport);
 #endif
 
-}
-
-
-/**
- * Creates the surface on which Vulkan will draw to.
- */
-void VkcInstance::createSurface(uint32_t id)
-{
-#ifdef _WIN32
-    //Fill surface info.
-    VkWin32SurfaceCreateInfoKHR surfaceInfo =
-    {
-        VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,    //VkStructureType                 sType;
-        NULL,                                               //const void*                     pNext;
-        0,                                                  //VkWin32SurfaceCreateFlagsKHR    flags;
-
-        NULL,                                               //HINSTANCE                       hinstance;
-        (HWND)id                                            //HWND                            hwnd;
-    };
-
-    //Create surface.
-    vkCreateWin32SurfaceKHR(instance, &surfaceInfo, NULL, &surface);
-
-#elif __ANDROID__
-    //Fill surface info.
-    VkAndroidSurfaceCreateInfoKHR surfaceInfo =
-    {
-        VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,  //VkStructureType                   sType;
-        NULL,                                               //const void*                       pNext;
-        0,                                                  //VkAndroidSurfaceCreateFlagsKHR    flags;
-
-        (ANativeWindow*)id                                  //ANativeWindow*                    window;
-    };
-
-    //Create surface.
-    vkCreateAndroidSurfaceKHR(instance, &surfaceInfo, NULL, &surface);
-
-#else
-    //Fill surface info.
-    VkXcbSurfaceCreateInfoKHR surfaceInfo =
-    {
-        VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,      //VkStructureType               sType;
-        NULL,                                               //const void*                   pNext;
-        0,                                                  //VkXcbSurfaceCreateFlagsKHR    flags;
-
-        NULL, //QX11Info::connection(),                     //xcb_connection_t*             connection;
-        (xcb_window_t)id                                    //xcb_window_t                  window;
-    };
-
-    //Create surface.
-    vkCreateXcbSurfaceKHR(instance, &surfaceInfo, NULL, &surface);
-
-#endif
 }
 
 
@@ -304,18 +202,18 @@ void VkcInstance::createSurface(uint32_t id)
  */
 void VkcInstance::getDevices()
 {
-    //Get the number of devices.
+    // Get the number of devices.
     uint32_t deviceCount;
-    vkEnumeratePhysicalDevices(instance, &deviceCount, NULL);
+    vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
 
-    //Get the device list.
+    // Get the device list.
     QVector<VkPhysicalDevice> physicalDevices, vector;
     physicalDevices.resize(deviceCount);
     vkEnumeratePhysicalDevices(instance, &deviceCount, physicalDevices.data());
 
     for (int i = 0; i < physicalDevices.size(); i++)
     {
-        //Get properties.
+        // Get properties.
         VkPhysicalDeviceProperties deviceProperties;
         vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProperties);
 
@@ -330,197 +228,131 @@ void VkcInstance::getDevices()
 
     for (int i = 0; i < physicalDevices.size(); i++)
     {
-        VkcDevice *device = new VkcDevice(physicalDevices[i], surface);
+        VkcDevice *device = new VkcDevice(physicalDevices[i]);
         devices.append(device);
     }
 }
 
 
 /**
- * Create render utility objects.
+ * Display objects on screen.
  */
-void VkcInstance::setupRender(const VkcDevice *device)
+void VkcInstance::render()
 {
-    //Create uniform buffer.
-    uniformBuffer = new VkcBuffer(16 * sizeof(float), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, device);
+    // Get the queue and command buffer.
+    // /@todo For this thread.
+    const VkcDevice         *device =           context->device;
+    const VkcSwapchain      *swapchain =        context->swapchain;
+    const VkcPipeline       *pipeline =         context->pipeline;
+    VkQueue                 activeQueue =       context->commandChain[0].queue;
+    VkCommandBuffer         commandBuffer =     context->commandChain[0].buffer;
 
-    //Create present buffer.
-    presentBuffer = new VkcBuffer(width * height * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT, device);
-
-    //Fill semaphore create info.
-    VkSemaphoreCreateInfo semaphoreInfo =
-    {
-        VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,    //VkStructureType           sType;
-        NULL,                                       //const void*               pNext;
-        0                                           //VkSemaphoreCreateFlags    flags;
-    };
-
-    //Create semaphores.
-    vkCreateSemaphore(device->logical, &semaphoreInfo, NULL, &sphAcquire);
-    vkCreateSemaphore(device->logical, &semaphoreInfo, NULL, &sphRender);
-
-
-    //Fill fence create info.
-    VkFenceCreateInfo fenceInfo =
-    {
-        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,    //VkStructureType           sType;
-        NULL,                                   //const void*               pNext;
-        0                                       //VkFenceCreateFlags        flags;
-    };
-
-    //Create fence.
-    vkCreateFence(device->logical, &fenceInfo, NULL, &fence);
-
-
-    //Fill uniform buffer info.
-    VkDescriptorBufferInfo uniformBufferInfo =
-    {
-        uniformBuffer->handle,      //VkBuffer        buffer;
-        0,                          //VkDeviceSize    offset;
-        VK_WHOLE_SIZE               //VkDeviceSize    range;
-    };
-
-    //Fill write descriptor set info.
-    VkWriteDescriptorSet writeSet =
-    {
-
-        VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,     //VkStructureType                  sType;
-        NULL,                                       //const void*                      pNext;
-
-        pipeline->descriptorSets[0],                //VkDescriptorSet                  dstSet;
-        0,                                          //uint32_t                         dstBinding;
-        0,                                          //uint32_t                         dstArrayElement;
-        1,                                          //uint32_t                         descriptorCount;
-        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,          //VkDescriptorType                 descriptorType;
-
-        NULL,                                       //const VkDescriptorImageInfo*     pImageInfo;
-        &uniformBufferInfo,                         //const VkDescriptorBufferInfo*    pBufferInfo;
-        NULL                                        //const VkBufferView*              pTexelBufferView;
-
-    };
-
-    //Update descriptor set.
-    vkUpdateDescriptorSets(device->logical, 1, &writeSet, 0, NULL);
-}
-
-
-/**
- * Destroy render utility objects.
- */
-void VkcInstance::unsetupRender(const VkcDevice *device)
-{
-    //Destroy uniform buffer.
-    if (uniformBuffer != NULL)
-        delete uniformBuffer;
-
-    //Destroy present buffer.
-    if (presentBuffer != NULL)
-        delete presentBuffer;
-
-    //Destroy semaphores.
-    vkDestroySemaphore(device->logical, sphAcquire, NULL);
-    vkDestroySemaphore(device->logical, sphRender, NULL);
-
-    //Destroy fence.
-    vkDestroyFence(device->logical, fence, NULL);
-}
-
-
-/**
- * Display objects to surface.
- */
-void VkcInstance::render(const VkcDevice *device, const VkcSwapchain *swapchain)
-{
-    //Get the queue and command buffer.
-    ///@todo For this thread.
-    VkQueue activeQueue = device->queueFamilies[ACTIVE_FAMILY].queues[0];
-    VkCommandBuffer commandBuffer = device->queueFamilies[ACTIVE_FAMILY].commandBuffers[0];
-
-    //Get the next image available.
+    // Get the next image available.
     uint32_t nextImageIdx;
     VkResult result = vkAcquireNextImageKHR(device->logical, swapchain->handle, UINT64_MAX, sphAcquire, VK_NULL_HANDLE, &nextImageIdx);
-    VkcImage *nextImage = swapchain->colorImages[nextImageIdx];
+    MgImage *nextImage = swapchain->colorImages[nextImageIdx];
 
 
-    //Fill commmand buffer begin info.
+    // Fill commmand buffer begin info.
     VkCommandBufferBeginInfo commandBeginInfo =
     {
-        VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,    //VkStructureType                          sType;
-        NULL,                                           //const void*                              pNext;
-        VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,    //VkCommandBufferUsageFlags                flags;
+        VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,    // VkStructureType                          sType;
+        nullptr,                                           // const void*                              pNext;
+        VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,    // VkCommandBufferUsageFlags                flags;
 
-        NULL                                            //const VkCommandBufferInheritanceInfo*    pInheritanceInfo;
+        nullptr                                            // const VkCommandBufferInheritanceInfo*    pInheritanceInfo;
     };
 
-    //Begin command recording.
+    // Begin command recording.
     vkBeginCommandBuffer(commandBuffer, &commandBeginInfo);
 
-    //Change image layout to color attachment optimal.
+    // Change image layout to color attachment optimal.
     nextImage->changeLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, commandBuffer);
 
 
-    //Fill render pass begin info.
+    // Fill render pass begin info.
     VkRenderPassBeginInfo renderPassBeginInfo =
     {
-        VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,       //VkStructureType        sType;
-        NULL,                                           //const void*            pNext;
+        VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,       // VkStructureType        sType;
+        nullptr,                                        // const void*            pNext;
 
-        swapchain->renderPass,                          //VkRenderPass           renderPass;
-        swapchain->frameBuffers[nextImageIdx],          //VkFramebuffer          framebuffer;
-        {0, 0, width, height},                          //VkRect2D               renderArea;
-        2,                                              //uint32_t               clearValueCount;
-        swapchain->clearValues                          //const VkClearValue*    pClearValues;
+        swapchain->renderPass,                          // VkRenderPass           renderPass;
+        swapchain->framebuffers[nextImageIdx],          // VkFramebuffer          framebuffer;
+        {0, 0, width, height},                          // VkRect2D               renderArea;
+        2,                                              // uint32_t               clearValueCount;
+        swapchain->clearValues                          // const VkClearValue*    pClearValues;
     };
 
-    //Begin render pass.
+    // Begin render pass.
     vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    //Bind the graphics pipeline.
+    // Bind the graphics pipeline.
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle);
 
-    //Bind descriptor sets.
+    // Resolve dynamic states.
+    VkViewport viewport =
+    {
+        0.0f,               // float    x;
+        0.0f,               // float    y;
+        (float)width,       // float    width;
+        (float)height,      // float    height;
+        0.0f,               // float    minDepth;
+        1.0f                // float    maxDepth;
+    };
+
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor =
+    {
+        {0, 0},             // VkOffset2D    offset;
+        {width, height}     // VkExtent2D    extent;
+    };
+
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+    // Bind descriptor sets.
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout, 0,
-                            1, &pipeline->descriptorSets[0], 0, NULL);
+                            1, &pipeline->descriptorSet, 0, nullptr);
 
 
-    //Get the view-projection matrix.
+    // Get the view-projection matrix.
     QMatrix4x4 vpMatrix;
-    camera->getViewProjectionMatrix(vpMatrix);
+    camera->getViewProjectionMatrix(&vpMatrix);
 
-    //Render our entities.
+    // Render our entities.
     square->render(commandBuffer, uniformBuffer, vpMatrix, device);
 
-    //End render pass.
+    // End render pass.
     vkCmdEndRenderPass(commandBuffer);
 
 
-    //Change image layout to present.
+    // Change image layout to present.
     nextImage->changeLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, commandBuffer);
 
-    //Stop command recording.
+    // Stop command recording.
     vkEndCommandBuffer(commandBuffer);
 
 
-    //Fill queue submit info.
+    // Fill queue submit info.
     VkPipelineStageFlags stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkSubmitInfo submitInfo =
     {
-        VK_STRUCTURE_TYPE_SUBMIT_INFO,      //VkStructureType                sType;
-        NULL,                               //const void*                    pNext;
+        VK_STRUCTURE_TYPE_SUBMIT_INFO,      // VkStructureType                sType;
+        nullptr,                               // const void*                    pNext;
 
-        1,                                  //uint32_t                       waitSemaphoreCount;
-        &sphAcquire,                        //const VkSemaphore*             pWaitSemaphores;
+        1,                                  // uint32_t                       waitSemaphoreCount;
+        &sphAcquire,                        // const VkSemaphore*             pWaitSemaphores;
 
-        &stageMask,                         //const VkPipelineStageFlags*    pWaitDstStageMask;
+        &stageMask,                         // const VkPipelineStageFlags*    pWaitDstStageMask;
 
-        1,                                  //uint32_t                       commandBufferCount;
-        &commandBuffer,                     //const VkCommandBuffer*         pCommandBuffers;
+        1,                                  // uint32_t                       commandBufferCount;
+        &commandBuffer,                     // const VkCommandBuffer*         pCommandBuffers;
 
-        1,                                  //uint32_t                       signalSemaphoreCount;
-        &sphRender                          //const VkSemaphore*             pSignalSemaphores;
+        1,                                  // uint32_t                       signalSemaphoreCount;
+        &sphRender                          // const VkSemaphore*             pSignalSemaphores;
     };
 
-    //Submit queue.
+    // Submit queue.
     vkQueueSubmit(activeQueue, 1, &submitInfo, fence);
 
     vkWaitForFences(device->logical, 1, &fence, VK_TRUE, UINT64_MAX);
@@ -529,22 +361,220 @@ void VkcInstance::render(const VkcDevice *device, const VkcSwapchain *swapchain)
     vkResetCommandBuffer(commandBuffer, 0);
 
 
-    //Fill queue present info.
+    // Fill queue present info.
     VkPresentInfoKHR presentInfo =
     {
-        VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, //VkStructureType          sType;
-        NULL,                               //const void*              pNext;
+        VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, // VkStructureType          sType;
+        nullptr,                               // const void*              pNext;
 
-        1,                                  //uint32_t                 waitSemaphoreCount;
-        &sphRender,                         //const VkSemaphore*       pWaitSemaphores;
+        1,                                  // uint32_t                 waitSemaphoreCount;
+        &sphRender,                         // const VkSemaphore*       pWaitSemaphores;
 
-        1,                                  //uint32_t                 swapchainCount;
-        &swapchain->handle,                 //const VkSwapchainKHR*    pSwapchains;
+        1,                                  // uint32_t                 swapchainCount;
+        &swapchain->handle,                 // const VkSwapchainKHR*    pSwapchains;
 
-        &nextImageIdx,                      //const uint32_t*          pImageIndices;
-        &result                             //VkResult*                pResults;
+        &nextImageIdx,                      // const uint32_t*          pImageIndices;
+        &result                             // VkResult*                pResults;
     };
 
-    //Now present.
+    // Now present.
     vkQueuePresentKHR(activeQueue, &presentInfo);
+}
+
+
+/**
+ * Recreate the swapchain and pipeline to fit window.
+ */
+void VkcInstance::resize()
+{
+    QWidget *parent = (QWidget*)this->parent();
+    if (width != (uint32_t)parent->width() || height != (uint32_t)parent->height())
+    {
+        // Update resolution fields.
+        width = parent->width();
+        height = parent->height();
+
+        // Resize context.
+        context->resize();
+
+        // Update projection matrix.
+        camera->setProjectionMatrix(3.14159f / 2, (float)width / (float)height, 1, 100);
+    }
+}
+
+
+/**
+ * Print the property list of all physical devices.
+ */
+void VkcInstance::printDevices(QFile *file)
+{
+    file->open(QIODevice::WriteOnly);
+
+    for (int i = 0; i < devices.size(); i++)
+    {
+        VkPhysicalDeviceProperties devProp = devices[i]->properties;
+
+        // Interpret version data.
+        struct
+        {
+            uint32_t a, b, c;
+        } vk, drv, nv, amd;
+
+        // Interpret device type.
+        QString deviceType;
+        switch (devProp.deviceType) {
+        default:
+            deviceType = "Other";
+            break;
+        case 1:
+            deviceType = "Integrated GPU";
+            break;
+        case 2:
+            deviceType = "Discrete GPU";
+            break;
+        case 3:
+            deviceType = "Virtual GPU";
+            break;
+        case 4:
+            deviceType = "CPU";
+            break;
+        }
+
+        vk.a = VK_VERSION_MAJOR(devProp.apiVersion);
+        vk.b = VK_VERSION_MINOR(devProp.apiVersion);
+        vk.c = VK_VERSION_PATCH(devProp.apiVersion);
+
+        drv.a = VK_VERSION_MAJOR(devProp.driverVersion);
+        drv.b = VK_VERSION_MINOR(devProp.driverVersion);
+        drv.c = VK_VERSION_PATCH(devProp.driverVersion);
+
+        nv.a = NV_VERSION_MAJOR(devProp.driverVersion);
+        nv.b = NV_VERSION_MINOR(devProp.driverVersion);
+        nv.c = NV_VERSION_PATCH(devProp.driverVersion);
+
+        amd.a = AMD_VERSION_MAJOR(devProp.driverVersion);
+        amd.b = AMD_VERSION_MINOR(devProp.driverVersion);
+        amd.c = AMD_VERSION_PATCH(devProp.driverVersion);
+
+        file->write(QString("Device Name:           %1\r\n").arg(devProp.deviceName).toStdString().data());
+        file->write(QString("Device Type:           %1\r\n").arg(deviceType).toStdString().data());
+        file->write(QString("Driver Version:        %1.%2.%3\r\n").arg(drv.a).arg(drv.b).arg(drv.c).toStdString().data());
+        file->write(QString("   nVidia GeForce:     %1.%2.%3\r\n").arg(nv.a).arg(nv.b).arg(nv.c).toStdString().data());
+        file->write(QString("   AMD Radeon:         %1.%2.%3\r\n").arg(amd.a).arg(amd.b).arg(amd.c).toStdString().data());
+        file->write(QString("API Version:           %1.%2.%3\r\n\r\n").arg(vk.a).arg(vk.b).arg(vk.c).toStdString().data());
+    }
+
+    file->close();
+}
+
+
+/**
+ * Create render utility objects.
+ */
+void VkcInstance::setupRender(const VkcDevice *device)
+{
+    // Create uniform buffer.
+    uniformBuffer.create(16 * sizeof(float), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, device);
+
+    // Create present buffer.
+    presentBuffer.create(width * height * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT, device);
+
+    // Fill semaphore create info.
+    VkSemaphoreCreateInfo semaphoreInfo =
+    {
+        VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,    // VkStructureType           sType;
+        nullptr,                                       // const void*               pNext;
+        0                                           // VkSemaphoreCreateFlags    flags;
+    };
+
+    // Create semaphores.
+    vkCreateSemaphore(device->logical, &semaphoreInfo, nullptr, &sphAcquire);
+    vkCreateSemaphore(device->logical, &semaphoreInfo, nullptr, &sphRender);
+
+
+    // Fill fence create info.
+    VkFenceCreateInfo fenceInfo =
+    {
+        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,    // VkStructureType           sType;
+        nullptr,                                   // const void*               pNext;
+        0                                       // VkFenceCreateFlags        flags;
+    };
+
+    // Create fence.
+    vkCreateFence(device->logical, &fenceInfo, nullptr, &fence);
+
+
+    // Fill uniform buffer info.
+    VkDescriptorBufferInfo uniformBufferInfo =
+    {
+        uniformBuffer.handle,   // VkBuffer        buffer;
+        0,                      // VkDeviceSize    offset;
+        VK_WHOLE_SIZE           // VkDeviceSize    range;
+    };
+
+    // Fill texture info.
+    VkDescriptorImageInfo textureInfo =
+    {
+        tux.sampler,            // VkSampler        sampler;
+        tux.view,               // VkImageView      imageView;
+        tux.info.layout         // VkImageLayout    imageLayout;
+    };
+
+    // Fill write descriptor set info.
+    VkWriteDescriptorSet writeSets[2] =
+    {
+        {
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,     // VkStructureType                  sType;
+            nullptr,                                    // const void*                      pNext;
+
+            context->pipeline->descriptorSet,           // VkDescriptorSet                  dstSet;
+            0,                                          // uint32_t                         dstBinding;
+            0,                                          // uint32_t                         dstArrayElement;
+            1,                                          // uint32_t                         descriptorCount;
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,          // VkDescriptorType                 descriptorType;
+
+            nullptr,                                    // const VkDescriptorImageInfo*     pImageInfo;
+            &uniformBufferInfo,                         // const VkDescriptorBufferInfo*    pBufferInfo;
+            nullptr                                     // const VkBufferView*              pTexelBufferView;
+        },
+
+        {
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,     // VkStructureType                  sType;
+            nullptr,                                    // const void*                      pNext;
+
+            context->pipeline->descriptorSet,           // VkDescriptorSet                  dstSet;
+            10,                                         // uint32_t                         dstBinding;
+            0,                                          // uint32_t                         dstArrayElement;
+            1,                                          // uint32_t                         descriptorCount;
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,  // VkDescriptorType                 descriptorType;
+
+            &textureInfo,                               // const VkDescriptorImageInfo*     pImageInfo;
+            nullptr,                                    // const VkDescriptorBufferInfo*    pBufferInfo;
+            nullptr                                     // const VkBufferView*              pTexelBufferView;
+        }
+
+    };
+
+    // Update descriptor set.
+    vkUpdateDescriptorSets(device->logical, 2, writeSets, 0, nullptr);
+}
+
+
+/**
+ * Destroy render utility objects.
+ */
+void VkcInstance::unsetupRender(const VkcDevice *device)
+{
+    // Destroy uniform buffer.
+    uniformBuffer.destroy();
+
+    // Destroy present buffer.
+    presentBuffer.destroy();
+
+    // Destroy semaphores.
+    vkDestroySemaphore(device->logical, sphAcquire, nullptr);
+    vkDestroySemaphore(device->logical, sphRender, nullptr);
+
+    // Destroy fence.
+    vkDestroyFence(device->logical, fence, nullptr);
 }

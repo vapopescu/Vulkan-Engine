@@ -1,43 +1,18 @@
 #ifndef VKC_INSTANCE_H
 #define VKC_INSTANCE_H
 
-#ifdef _WIN32
-#define VK_USE_PLATFORM_WIN32_KHR 1
+#include "stable.h"
+#include "vkc_context.h"
+#include "vkc_device.h"
+#include "mgcamera.h"
+#include "mgbuffer.h"
+#include "vkc_entity.h"
+#include "mgtexture2d.h"
 
-#elif __ANDROID__
-#define VK_USE_PLATFORM_ANDROID_KHR 1
-
-#else
-#define VK_USE_PLATFORM_XCB_KHR 1
-
-#endif
-
-#define PROC(NAME) PFN_vk##NAME pf##NAME = NULL
+#define PROC(NAME) PFN_vk##NAME pf##NAME = nullptr
 #define GET_IPROC(INSTANCE, NAME) pf##NAME = (PFN_vk##NAME)vkGetInstanceProcAddr(INSTANCE, "vk" #NAME)
 #define GET_DPROC(INSTANCE, NAME) pf##NAME = (PFN_vk##NAME)vkGetDeviceProcAddr(INSTANCE, "vk" #NAME)
 
-#include <QWidget>
-#include <QFile>
-#include <QImage>
-#include <QPainter>
-#include <QMatrix4x4>
-#if DEBUG == 1
-#include <QDebug>
-#endif
-
-#include <vulkan.h>
-#include <vk_layer.h>
-
-#include <vkc_device.h>
-#include <vkc_image.h>
-#include <vkc_swapchain.h>
-#include <vkc_pipeline.h>
-
-#include <vkc_camera.h>
-#include <vkc_buffer.h>
-#include <vkc_entity.h>
-
-#define ACTIVE_DEVICE 0
 
 /**
  * Class used as the Vulkan instance.
@@ -48,19 +23,16 @@ class VkcInstance : public QObject
 {
     Q_OBJECT
 
-    //Objects:
+    // Objects:
 private:
     VkInstance                  instance;
-    VkSurfaceKHR                surface;
     QVector<VkcDevice*>         devices;
-    VkcSwapchain                *swapchain;
-    VkcPipeline                 *pipeline;
+    VkcContext                  *context;
 
-
-    VkcBuffer                   *uniformBuffer;
-    VkcBuffer                   *presentBuffer;
+    MgBuffer                    uniformBuffer;
+    MgBuffer                    presentBuffer;
     void                        *pPresentBuffer;
-    VkcCamera                   *camera;
+    MgCamera                    *camera;
 
     uint32_t                    width;
     uint32_t                    height;
@@ -69,42 +41,38 @@ private:
     VkSemaphore                 sphRender;
     VkFence                     fence;
 
-    VkcEntity                   *square;
+    VkcEntity*                  square;
+    MgTexture2D                 tux;
 
     VkDebugReportCallbackEXT    debugReport;
 
-#if DEBUG == 1
+#ifdef QT_DEBUG
     PROC(CreateDebugReportCallbackEXT);
     PROC(DestroyDebugReportCallbackEXT);
 #endif
 
 
-    //Functions:
+    // Functions:
 public:
     VkcInstance(QWidget *parent = 0);
     ~VkcInstance();
 
+private:
+    void createInstance();
+    void getDevices();
+
+public:
     void render();
+    void resize();
     void printDevices(
             QFile               *file
             );
-
-private:
-    void createInstance();
-    void createSurface(
-            uint32_t            id
-            );
-    void getDevices();
 
     void setupRender(
             const VkcDevice     *device
             );
     void unsetupRender(
             const VkcDevice     *device
-            );
-    void render(
-            const VkcDevice     *device,
-            const VkcSwapchain  *swapchain
             );
 };
 

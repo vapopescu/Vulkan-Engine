@@ -1,16 +1,10 @@
 #ifndef VKC_ENTITY_H
 #define VKC_ENTITY_H
 
-#include <QMatrix4x4>
-#if DEBUG == 1
-#include <QDebug>
-#endif
-
-#include <vulkan.h>
-
-#include <vkc_device.h>
-#include <vkc_buffer.h>
-#include <vkc_pipeline.h>
+#include "stable.h"
+#include "vkc_device.h"
+#include "mgbuffer.h"
+#include "vkc_pipeline.h"
 
 
 /**
@@ -20,16 +14,20 @@
  */
 class VkcEntity
 {
-    //Objects:
+    // Objects:
 protected:
     QVector<VkVertex>           vertices;
     QVector<uint32_t>           indices;
 
-    QMatrix4x4                  modelMatrix;
+    MgBuffer                    buffer;
 
-    VkcBuffer                   *buffer;
+    QVector3D                   position;
+    QVector3D                   scale;
+    QQuaternion                 rotation;
 
-    //Functions:
+    float                       dir;
+
+    // Functions:
 public:
     VkcEntity();
     VkcEntity(
@@ -39,7 +37,7 @@ public:
 
     void render(
             VkCommandBuffer     commandBuffer,
-            const VkcBuffer     *uniformBuffer,
+            MgBuffer           uniformBuffer,
             QMatrix4x4          vpMatrix,
             const VkcDevice     *device
             );

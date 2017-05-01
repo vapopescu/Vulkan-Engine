@@ -1,16 +1,9 @@
 #ifndef VKC_PIPELINE_H
 #define VKC_PIPELINE_H
 
-#include <QFile>
-#include <QVector>
-#if DEBUG == 1
-#include <QDebug>
-#endif
-
-#include <vulkan.h>
-
-#include <vkc_device.h>
-#include <vkc_swapchain.h>
+#include "stable.h"
+#include "vkc_device.h"
+#include "vkc_swapchain.h"
 
 
 /**
@@ -30,7 +23,7 @@ struct VkVertex {
  */
 class VkcPipeline
 {
-    //Objects:
+    // Objects:
 public:
     VkPipeline                      handle;
     VkPipelineLayout                layout;
@@ -39,13 +32,13 @@ public:
     VkShaderModule                  fragShader;
 
     VkDescriptorPool                descriptorPool;
-    QVector<VkDescriptorSet>        descriptorSets;
-    QVector<VkDescriptorSetLayout>  setLayouts;
+    VkDescriptorSet                 descriptorSet;
+    VkDescriptorSetLayout           setLayout;
 
 private:
     VkDevice                        logicalDevice;
 
-    //Functions:
+    // Functions:
 public:
     VkcPipeline();
     VkcPipeline(
@@ -55,7 +48,7 @@ public:
     ~VkcPipeline();
 
 private:
-    void createShader(
+    VkResult createShader(
             VkShaderModule          &shader,
             QString                 fileName,
             const VkcDevice         *device

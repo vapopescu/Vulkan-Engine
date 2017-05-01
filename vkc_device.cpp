@@ -14,25 +14,20 @@ VkcDevice::VkcDevice()
 /**
  * Create the device.
  */
-VkcDevice::VkcDevice(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) : VkcDevice()
+VkcDevice::VkcDevice(VkPhysicalDevice physicalDevice) : VkcDevice()
 {
-    //Get the number of queue properties.
+    // Get the number of queue properties.
     uint32_t familyCount;
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &familyCount, NULL);
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &familyCount, nullptr);
 
-    //Get the queue property list.
+    // Get the queue property list.
     QVector<VkQueueFamilyProperties> queueProperties;
     queueProperties.resize(familyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &familyCount, queueProperties.data());
 
-    //Get the queue families that support graphic and surface present commands.
+    // Get the queue families that support graphic and surface present commands.
     for(int i = 0; i < queueProperties.size(); i++)
-    {
-        VkBool32 ok;
-        vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &ok);
-
-        //If queue properties are ok, add it to the list.
-        if((queueProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && ok)
+        if(queueProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
         {
             VkcQueueFamily queueFamilyStruct;
             queueFamilyStruct.index = i;
@@ -40,43 +35,43 @@ VkcDevice::VkcDevice(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) : Vk
 
             queueFamilies.append(queueFamilyStruct);
         }
-    }
 
 
-    //Get physical device properties, features and memory properties.
+    // Get physical device properties, features and memory properties.
     vkGetPhysicalDeviceProperties(physicalDevice, &properties);
     vkGetPhysicalDeviceFeatures(physicalDevice, &features);
     vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
 
 
-    //For each queue family...
+    // For each queue family...
     QVector<VkDeviceQueueCreateInfo> queueInfos;
+    QVector<float> queuePriorities;
     for (int i = 0; i < queueFamilies.size(); i++)
     {
         uint32_t queueCount = queueFamilies[i].properties.queueCount;
         uint32_t familyIdx = queueFamilies[i].index;
 
-        //Set queue priorities.
-        QVector<float> queuePriorities;
+        // Set queue priorities.
+        int offset = queuePriorities.size();
         for (uint32_t i = 0; i < queueCount; i++)
             queuePriorities.append(1.0f);
 
-        //Fill device queue info.
+        // Fill device queue info.
         VkDeviceQueueCreateInfo queueInfo =
         {
-            VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, //VkStructureType             sType;
-            NULL,                                       //const void*                 pNext;
-            0,                                          //VkDeviceQueueCreateFlags    flags;
+            VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, // VkStructureType             sType;
+            nullptr,                                    // const void*                 pNext;
+            0,                                          // VkDeviceQueueCreateFlags    flags;
 
-            familyIdx,                                  //uint32_t                    queueFamilyIndex;
-            (uint32_t)queuePriorities.size(),           //uint32_t                    queueCount;
-            queuePriorities.data()                      //const float*                pQueuePriorities;
+            familyIdx,                                  // uint32_t                    queueFamilyIndex;
+            queueCount,                                 // uint32_t                    queueCount;
+            &queuePriorities.at(offset)                 // const float*                pQueuePriorities;
         };
 
         queueInfos.append(queueInfo);
     }
 
-    //Setup device layers and extentions.
+    // Setup device layers and extentions.
     QVector<const char*> deviceLayers =
     {
 
@@ -87,73 +82,73 @@ VkcDevice::VkcDevice(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) : Vk
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
 
-    //Fill device info.
+    // Fill device info.
     VkDeviceCreateInfo deviceInfo =
     {
-        VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,       //VkStructureType                    sType;
-        NULL,                                       //const void*                        pNext;
-        0,                                          //VkDeviceCreateFlags                flags;
+        VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,       // VkStructureType                    sType;
+        nullptr,                                    // const void*                        pNext;
+        0,                                          // VkDeviceCreateFlags                flags;
 
-        (uint32_t)queueInfos.size(),                //uint32_t                           queueCreateInfoCount;
-        queueInfos.data(),                          //const VkDeviceQueueCreateInfo*     pQueueCreateInfos;
+        (uint32_t)queueInfos.size(),                // uint32_t                           queueCreateInfoCount;
+        queueInfos.data(),                          // const VkDeviceQueueCreateInfo*     pQueueCreateInfos;
 
-        (uint32_t)deviceLayers.size(),              //uint32_t                           enabledLayerCount;
-        deviceLayers.data(),                        //const char* const*                 ppEnabledLayerNames;
+        (uint32_t)deviceLayers.size(),              // uint32_t                           enabledLayerCount;
+        deviceLayers.data(),                        // const char* const*                 ppEnabledLayerNames;
 
-        (uint32_t)deviceExtentions.size(),          //uint32_t                           enabledExtensionCount;
-        deviceExtentions.data(),                    //const char* const*                 ppEnabledExtensionNames;
+        (uint32_t)deviceExtentions.size(),          // uint32_t                           enabledExtensionCount;
+        deviceExtentions.data(),                    // const char* const*                 ppEnabledExtensionNames;
 
-        &features                                   //const VkPhysicalDeviceFeatures*    pEnabledFeatures;
+        &features                                   // const VkPhysicalDeviceFeatures*    pEnabledFeatures;
     };
 
-    //Create device.
-    vkCreateDevice(physicalDevice, &deviceInfo, NULL, &logical);
+    // Create device.
+    vkCreateDevice(physicalDevice, &deviceInfo, nullptr, &logical);
 
 
-    //For each queue family...
+    // For each queue family...
     for (int i = 0; i < queueFamilies.size(); i++)
     {
         uint32_t queueCount = queueFamilies[i].properties.queueCount;
         uint32_t familyIdx = queueFamilies[i].index;
 
-        //Get queues.
+        // Get queues.
         queueFamilies[i].queues.resize(queueCount);
         for (uint32_t j = 0; j < queueCount; j++)
             vkGetDeviceQueue(logical, familyIdx, j, &queueFamilies[i].queues[j]);
 
 
-        //Fill command pool info.
+        // Fill command pool info.
         VkCommandPoolCreateInfo commandPoolCreateInfo =
         {
-            VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,         //VkStructureType             sType;
-            NULL,                                               //const void*                 pNext;
-            VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,    //VkCommandPoolCreateFlags    flags;
+            VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,         // VkStructureType             sType;
+            nullptr,                                               // const void*                 pNext;
+            VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,    // VkCommandPoolCreateFlags    flags;
 
-            familyIdx                                           //uint32_t                    queueFamilyIndex;
+            familyIdx                                           // uint32_t                    queueFamilyIndex;
         };
 
-        //Create command pool.
-        vkCreateCommandPool(logical, &commandPoolCreateInfo, NULL, &queueFamilies[i].commandPool);
+        // Create command pool.
+        vkCreateCommandPool(logical, &commandPoolCreateInfo, nullptr, &queueFamilies[i].commandPool);
 
 
-        //Fill command buffer allocation info.
+        // Fill command buffer allocation info.
         queueFamilies[i].commandBuffers.resize(queueCount);
         VkCommandBufferAllocateInfo commandBufferAllocateInfo =
         {
-            VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,     //VkStructureType         sType;
-            NULL,                                               //const void*             pNext;
+            VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,     // VkStructureType         sType;
+            nullptr,                                               // const void*             pNext;
 
-            queueFamilies[i].commandPool,                       //VkCommandPool           commandPool;
-            VK_COMMAND_BUFFER_LEVEL_PRIMARY,                    //VkCommandBufferLevel    level;
-            (uint32_t)queueFamilies[i].commandBuffers.size()    //uint32_t                commandBufferCount;
+            queueFamilies[i].commandPool,                       // VkCommandPool           commandPool;
+            VK_COMMAND_BUFFER_LEVEL_PRIMARY,                    // VkCommandBufferLevel    level;
+            (uint32_t)queueFamilies[i].commandBuffers.size()    // uint32_t                commandBufferCount;
         };
 
-        //Allocate command buffers.
+        // Allocate command buffers.
         vkAllocateCommandBuffers(logical, &commandBufferAllocateInfo, queueFamilies[i].commandBuffers.data());
     }
 
 
-    //Store handle to physical device.
+    // Store handle to physical device.
     this->physical = physicalDevice;
 }
 
@@ -176,12 +171,12 @@ VkcDevice::~VkcDevice()
             }
 
             if (queueFamilies[0].commandPool != VK_NULL_HANDLE)
-                vkDestroyCommandPool(logical, queueFamilies[0].commandPool, NULL);
+                vkDestroyCommandPool(logical, queueFamilies[0].commandPool, nullptr);
 
             queueFamilies.removeFirst();
         }
 
-        vkDestroyDevice(logical, NULL);
+        vkDestroyDevice(logical, nullptr);
     }
 }
 
@@ -199,7 +194,7 @@ void VkcDevice::getQueueFamilies(QVector<uint32_t> &queueFamilies) const
 /**
  * Get memory type index.
  */
-void VkcDevice::getMemoryTypeIndex(uint32_t &typeIdx, VkMemoryPropertyFlags propertyMask, VkMemoryRequirements requirements) const
+VkResult VkcDevice::getMemoryTypeIndex(VkMemoryPropertyFlags propertyMask, VkMemoryRequirements requirements, uint32_t* pTypeIdx) const
 {
     for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
     {
@@ -208,9 +203,11 @@ void VkcDevice::getMemoryTypeIndex(uint32_t &typeIdx, VkMemoryPropertyFlags prop
         {
             if ((memoryType.propertyFlags & propertyMask) == propertyMask)
             {
-                typeIdx = i;
-                break;
+                *pTypeIdx = i;
+                return VK_SUCCESS;
             }
         }
     }
+
+    return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 }

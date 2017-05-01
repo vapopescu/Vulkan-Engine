@@ -1,12 +1,7 @@
 #ifndef VKC_DEVICE_H
 #define VKC_DEVICE_H
 
-#include <QVector>
-#if DEBUG == 1
-#include <QDebug>
-#endif
-
-#include <vulkan.h>
+#include "stable.h"
 
 #define ACTIVE_FAMILY 0
 
@@ -35,7 +30,7 @@ struct VkcQueueFamily
  */
 class VkcDevice
 {
-    //Objects:
+    // Objects:
 public:
     VkPhysicalDevice                    physical;
     VkDevice                            logical;
@@ -46,22 +41,21 @@ public:
     VkPhysicalDeviceFeatures            features;
     VkPhysicalDeviceMemoryProperties    memoryProperties;
 
-    //Functions
+    // Functions
 public:
     VkcDevice();
     VkcDevice(
-            VkPhysicalDevice            physicalDevice,
-            VkSurfaceKHR                surface
+            VkPhysicalDevice            physicalDevice
             );
     ~VkcDevice();
 
     void getQueueFamilies(
             QVector<uint32_t>           &queueFamilies
             ) const;
-    void getMemoryTypeIndex(
-            uint32_t                    &typeIdx,
+    VkResult getMemoryTypeIndex(
             VkMemoryPropertyFlags       propertyMask,
-            VkMemoryRequirements        requirements
+            VkMemoryRequirements        requirements,
+            uint32_t*                   pTypeIdx
             ) const;
 };
 

@@ -9,49 +9,53 @@ unix: QT += x11extras
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
-
 TARGET = "Vulkan Engine"
 TEMPLATE = app
 
+PRECOMPILED_HEADER = stable.h
+
 HEADERS += \
-    appwindow.h \
     vkc_swapchain.h \
-    vkc_image.h \
     vkc_device.h \
     vkc_entity.h \
     vkc_pipeline.h \
-    vkc_camera.h \
-    vkc_buffer.h \
     vkc_instance.h \
-    ui_form.h
+    vkc_context.h \
+    mgwindow.h \
+    mgimage.h \
+    stable.h \
+    mgtexture2d.h \
+    mgcamera.h \
+    mgbuffer.h
 
 SOURCES += \
     main.cpp \
-    appwindow.cpp \
     vkc_swapchain.cpp \
-    vkc_image.cpp \
     vkc_device.cpp \
     vkc_entity.cpp \
     vkc_pipeline.cpp \
-    vkc_camera.cpp \
-    vkc_buffer.cpp \
     vkc_instance.cpp \
-    ui_form.cpp
+    vkc_context.cpp \
+    mgwindow.cpp \
+    mgimage.cpp \
+    mgtexture2d.cpp \
+    mgcamera.cpp \
+    mgbuffer.cpp
 
 FORMS += \
-    appwindow.ui \
-    gui.ui
+    mgwindow.ui
 
 DISTFILES += \
     shader.vert \
     shader.frag
 
-QMAKE_CXXFLAGS += \
-    -Wno-pointer-arith
+INCLUDEPATH += \
+    $$(VULKAN_SDK)/Include/vulkan
 
-VK_SDK = "C:/VulkanSDK/1.0.17.0"
-
-INCLUDEPATH +=          $$VK_SDK/Include/vulkan
-
-unix|win32: LIBS +=     -L$$VK_SDK/Bin32/   -lvulkan-1
-win64: LIBS +=          -L$$VK_SDK/Bin/     -lvulkan-1
+contains(QT_ARCH, i386) {
+    LIBS += \
+        -L$$(VULKAN_SDK)/Lib32/ -lvulkan-1
+} else {
+    LIBS += \
+        -L$$(VULKAN_SDK)/Lib/ -lvulkan-1
+}

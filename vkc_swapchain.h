@@ -1,15 +1,9 @@
 #ifndef VKC_SWAPCHAIN_H
 #define VKC_SWAPCHAIN_H
 
-#include <QVector>
-#if DEBUG == 1
-#include <QDebug>
-#endif
-
-#include <vulkan.h>
-
-#include <vkc_device.h>
-#include <vkc_image.h>
+#include "stable.h"
+#include "vkc_device.h"
+#include "mgimage.h"
 
 
 /**
@@ -19,31 +13,47 @@
  */
 class VkcSwapchain
 {
-    //Objects:
+    // Objects:
 public:
     VkSwapchainKHR                  handle;
     VkRenderPass                    renderPass;
 
-    QVector<VkcColorImage*>         colorImages;
-    VkcDepthImage                   *depthImage;
+    QVector<MgImage*>               colorImages;
+    MgImage                         depthStencilImage;
 
-    QVector<VkFramebuffer>          frameBuffers;
+    QVector<VkFramebuffer>          framebuffers;
 
     VkExtent2D                      extent;
     VkClearValue                    clearValues[2];
 
-private:
+protected:
     QVector<VkSurfaceFormatKHR>     surfaceFormats;
-    VkDevice                        logicalDevice;
+    uint32_t                        imageCount;
+    const VkcDevice                 *device;
 
-    //Functions:
+    // Functions:
 public:
     VkcSwapchain();
+
     VkcSwapchain(
             VkSurfaceKHR            surface,
             const VkcDevice         *device
             );
+    VkcSwapchain(
+            VkRenderPass            renderPass,
+            VkSurfaceKHR            surface,
+            const VkcDevice         *device
+            );
     ~VkcSwapchain();
+
+protected:
+    void createSwapchain(
+            VkSurfaceKHR            surface,
+            const VkcDevice         *device
+            );
+    void createImages();
+    void createRenderPass();
+    void createFramebuffers();
 };
 
 #endif // VKC_SWAPCHAIN_H
