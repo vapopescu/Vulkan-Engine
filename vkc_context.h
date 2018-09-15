@@ -34,7 +34,6 @@ public:
 private:
     VkInstance                  instance;
 
-
     // Functions:
 public:
     VkcContext();

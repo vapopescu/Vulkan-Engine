@@ -7,12 +7,11 @@
 #include "mgcamera.h"
 #include "mgbuffer.h"
 #include "vkc_entity.h"
-#include "mgtexture2d.h"
+#include "mgimage.h"
 
 #define PROC(NAME) PFN_vk##NAME pf##NAME = nullptr
 #define GET_IPROC(INSTANCE, NAME) pf##NAME = (PFN_vk##NAME)vkGetInstanceProcAddr(INSTANCE, "vk" #NAME)
 #define GET_DPROC(INSTANCE, NAME) pf##NAME = (PFN_vk##NAME)vkGetDeviceProcAddr(INSTANCE, "vk" #NAME)
-
 
 /**
  * Class used as the Vulkan instance.
@@ -29,10 +28,9 @@ private:
     QVector<VkcDevice*>         devices;
     VkcContext                  *context;
 
-    MgBuffer                    uniformBuffer;
     MgBuffer                    presentBuffer;
     void                        *pPresentBuffer;
-    MgCamera                    *camera;
+    MgCamera                    camera;
 
     uint32_t                    width;
     uint32_t                    height;
@@ -41,8 +39,7 @@ private:
     VkSemaphore                 sphRender;
     VkFence                     fence;
 
-    VkcEntity*                  square;
-    MgTexture2D                 tux;
+    VkcEntity                   sphere;
 
     VkDebugReportCallbackEXT    debugReport;
 

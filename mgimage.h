@@ -18,16 +18,14 @@ enum MgImageType
  */
 struct MgImageInfo
 {
-    VkImageType                 type;
+    MgImageType                 type;
+    QString                     filePath;
     VkExtent3D                  extent;
     VkFormat                    format;
-    VkImageLayout               layout;
-    VkImageUsageFlags           usage;
-    VkImageSubresourceRange     resourceRange;
 
     VkImage                     image;
-    bool                        createView;
-    bool                        createSampler;
+    VkBool32                    createView;
+    VkBool32                    createSampler;
 };
 
 /**
@@ -42,12 +40,19 @@ public:
     VkSampler                   sampler =       VK_NULL_HANDLE;
 
     MgImageInfo                 info;
+    VkImageLayout               layout =        VK_IMAGE_LAYOUT_UNDEFINED;
 
 protected:
-    MgBuffer                    imageBuffer;
+    VkImageType                 imageType =     VK_IMAGE_TYPE_2D;
+    VkImageUsageFlags           usageMask =     0;
+    VkImageAspectFlags          aspectMask =    0;
+
+    uint32_t                    mipLevels =     0;
+    QVector<VkBufferImageCopy>  regions =       {};
+
     VkDeviceMemory              memory =        VK_NULL_HANDLE;
 
-    bool                        sharedImage =   true;
+    const VkcDevice             *pDevice =      nullptr;
 
     // Functions:
 public:
@@ -55,14 +60,10 @@ public:
             const VkcDevice     *pDevice,
             MgImageInfo         *pCreateInfo
             );
-    void destroy(
-            const VkcDevice     *pDevice
-            );
+    VkResult createView();
+    VkResult createSampler();
+    void destroy();
 
-    void getImageData(
-            MgBuffer           imageBuffer,
-            VkCommandBuffer     commandBuffer
-            );
     void changeLayout(
             VkImageLayout       oldLayout,
             VkImageLayout       newLayout,
@@ -71,7 +72,15 @@ public:
 
 protected:
     VkResult loadImage(
-            const VkcDevice     *pDevice
+            MgBuffer            *pImageBuffer
+            );
+    VkResult loadImageData(
+            MgBuffer            *pImageBuffer
+            );
+
+    void getImageData(
+            MgBuffer            buffer,
+            VkCommandBuffer     commandBuffer
             );
     void getAccessMask(
             VkAccessFlags       &accessMask,

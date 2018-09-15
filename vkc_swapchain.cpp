@@ -64,11 +64,11 @@ VkcSwapchain::~VkcSwapchain()
 
         while (colorImages.size() > 0)
         {
-            colorImages[0]->destroy(device);
+            colorImages[0]->destroy();
             colorImages.removeFirst();
         }
 
-        depthStencilImage.destroy(device);
+        depthStencilImage.destroy();
 
         if (handle != VK_NULL_HANDLE)
         {
@@ -100,7 +100,7 @@ void VkcSwapchain::createSwapchain(VkSurfaceKHR surface, const VkcDevice *device
         surfaceFormats[0].format = VK_FORMAT_R8G8B8A8_UNORM;
     }
 
-    for (int i = 1; i < surfaceFormats.count(); i++)
+    for (int i = 1; i < surfaceFormats.size(); i++)
     {
         if (surfaceFormats[i].format == VK_FORMAT_R8G8B8A8_UNORM)
         {
@@ -207,26 +207,18 @@ void VkcSwapchain::createImages()
     {
         MgImageInfo colorImageInfo =
         {
-            VK_IMAGE_TYPE_2D,                           // VkImageType               type;
-            {                                           // VkExtent3D                extent;
-                extent.width,                               // uint32_t              width;
-                extent.height,                              // uint32_t              height;
-                1                                           // uint32_t              depth;
+            MG_IMAGE_TYPE_SWAPCHAIN_COLOR,              // MgImageType                 type;
+            "",                                         // QString                     filePath;
+            {                                           // VkExtent3D                  extent;
+                extent.width,                               // uint32_t                width;
+                extent.height,                              // uint32_t                height;
+                1                                           // uint32_t                depth;
             },
-            surfaceFormats[0].format,                   // VkFormat                  format;
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,   // VkImageLayout             layout;
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,        // VkImageUsageFlags         usage;
-            {                                           // VkImageSubresourceRange   resourceRange;
-                VK_IMAGE_ASPECT_COLOR_BIT,                  // VkImageAspectFlags    aspectMask;
-                0,                                          // uint32_t              baseMipLevel;
-                1,                                          // uint32_t              levelCount;
-                0,                                          // uint32_t              baseArrayLayer;
-                1,                                          // uint32_t              layerCount;
-            },
+            surfaceFormats[0].format,                   // VkFormat                    format;
 
-            images[i],                                  // const VkImage             image;
-            true,                                       // bool                      createView;
-            true                                        // bool                      createSampler;
+            images[i],                                  // const VkImage               image;
+            VK_TRUE,                                    // VkBool32                    createView;
+            VK_TRUE                                     // VkBool32                    createSampler;
         };
 
         colorImages[i] = new MgImage();
@@ -235,27 +227,18 @@ void VkcSwapchain::createImages()
 
     MgImageInfo depthStencilImageInfo =
     {
-        VK_IMAGE_TYPE_2D,                                   // VkImageType               type;
-        {                                                   // VkExtent3D                extent;
-            extent.width,                                       // uint32_t              width;
-            extent.height,                                      // uint32_t              height;
-            1                                                   // uint32_t              depth;
+        MG_IMAGE_TYPE_SWAPCHAIN_DEPTH_STENCIL,          // MgImageType                 type;
+        "",                                             // QString                     filePath;
+        {                                               // VkExtent3D                  extent;
+            extent.width,                                   // uint32_t                width;
+            extent.height,                                  // uint32_t                height;
+            1                                               // uint32_t                depth;
         },
-        VK_FORMAT_D32_SFLOAT_S8_UINT,                       // VkFormat                  format;
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,   // VkImageLayout             layout;
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,        // VkImageUsageFlags         usage;
-        {                                                   // VkImageSubresourceRange   resourceRange;
-            VK_IMAGE_ASPECT_DEPTH_BIT |                         // VkImageAspectFlags    aspectMask;
-            VK_IMAGE_ASPECT_STENCIL_BIT,
-            0,                                                  // uint32_t              baseMipLevel;
-            1,                                                  // uint32_t              levelCount;
-            0,                                                  // uint32_t              baseArrayLayer;
-            1,                                                  // uint32_t              layerCount;
-        },
+        VK_FORMAT_D32_SFLOAT_S8_UINT,                   // VkFormat                    format;
 
-        VK_NULL_HANDLE,                                     // const VkImage             image;
-        true,                                               // bool                      createView;
-        true                                                // bool                      createSampler;
+        VK_NULL_HANDLE,                                 // const VkImage               image;
+        VK_TRUE,                                        // VkBool32                    createView;
+        VK_TRUE                                         // VkBool32                    createSampler;
     };
 
     // Create depth image.

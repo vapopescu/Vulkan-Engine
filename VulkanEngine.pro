@@ -24,9 +24,9 @@ HEADERS += \
     mgwindow.h \
     mgimage.h \
     stable.h \
-    mgtexture2d.h \
     mgcamera.h \
-    mgbuffer.h
+    mgbuffer.h \
+    mgnode.h
 
 SOURCES += \
     main.cpp \
@@ -38,9 +38,9 @@ SOURCES += \
     vkc_context.cpp \
     mgwindow.cpp \
     mgimage.cpp \
-    mgtexture2d.cpp \
     mgcamera.cpp \
-    mgbuffer.cpp
+    mgbuffer.cpp \
+    mgnode.cpp
 
 FORMS += \
     mgwindow.ui
@@ -50,12 +50,9 @@ DISTFILES += \
     shader.frag
 
 INCLUDEPATH += \
-    $$(VULKAN_SDK)/Include/vulkan
+    $$(VULKAN_SDK)/Include/ \
+    $$(ASSIMP_SDK)/include/
 
-contains(QT_ARCH, i386) {
-    LIBS += \
-        -L$$(VULKAN_SDK)/Lib32/ -lvulkan-1
-} else {
-    LIBS += \
-        -L$$(VULKAN_SDK)/Lib/ -lvulkan-1
-}
+LIBS += \
+    -L'$$(VULKAN_SDK)/Bin/' -L'$$(VULKAN_SDK)/Lib/' -lvulkan-1 \
+    -L'$$(ASSIMP_SDK)/bin/' -L'$$(ASSIMP_SDK)/lib/' -lassimp-vc140-mt

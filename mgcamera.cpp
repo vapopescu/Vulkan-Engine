@@ -6,18 +6,19 @@
  */
 MgCamera::MgCamera()
 {
-    // Set default position and rotation.
-    position = QVector3D(0.0f, -1.5f, 0.0f);
-    rotation = QQuaternion(1.0f, 0.0f, 0.0f, 0.0f);
-
     // Set coordinate system (right handed, Z up)
-    QVector3D right =   QVector3D( 1.0f,  0.0f,  0.0f);
-    QVector3D front =   QVector3D( 0.0f,  1.0f,  0.0f);
-    QVector3D up =      QVector3D( 0.0f,  0.0f,  1.0f);
+    QVector3D rightAxis =   QVector3D( 1.0f,  0.0f,  0.0f);
+    QVector3D frontAxis =   QVector3D( 0.0f,  1.0f,  0.0f);
+    QVector3D upAxis =      QVector3D( 0.0f,  0.0f,  1.0f);
 
-    axisMatrix.setColumn(0, right.toVector4D());
-    axisMatrix.setColumn(1, up.toVector4D());
-    axisMatrix.setColumn(2, -front.toVector4D());
+    axisMatrix.setColumn(0, rightAxis.toVector4D());
+    axisMatrix.setColumn(1, upAxis.toVector4D());
+    axisMatrix.setColumn(2, -frontAxis.toVector4D());
+
+    // Set default position and rotation.
+    position =  QVector3D( 1.5f,  1.5f,  1.5f);
+    lookAt =    QVector3D( 0.0f,  0.0f,  0.0f);
+    up =        QVector3D( 0.0f,  0.0f,  1.0f);
 }
 
 
@@ -80,9 +81,22 @@ void MgCamera::setProjectionMatrix(float verticalAngle, float aspectRatio, float
  */
 void MgCamera::getViewProjectionMatrix(QMatrix4x4 *pVPMatrix)
 {
-    QMatrix4x4 viewMatrix = axisMatrix;
-    viewMatrix.rotate(rotation.inverted());
-    viewMatrix.translate(-position);
+    // Compute translation matrix.
+    QMatrix4x4 translationMatrix;
+    translationMatrix.translate(-position);
+
+    // Compute rotation matrix.
+    QMatrix4x4 rotationMatrix;
+    QVector3D yAxis = (lookAt - position).normalized();
+    QVector3D xAxis = QVector3D::crossProduct(yAxis, up).normalized();
+    QVector3D zAxis = QVector3D::crossProduct(xAxis, yAxis).normalized();
+
+    rotationMatrix.setRow(0, xAxis);
+    rotationMatrix.setRow(1, yAxis);
+    rotationMatrix.setRow(2, zAxis);
+
+    // Compute view matrix.
+    QMatrix4x4 viewMatrix = axisMatrix * rotationMatrix * translationMatrix;
 
     *pVPMatrix = projectionMatrix * viewMatrix;
 }

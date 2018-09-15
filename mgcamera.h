@@ -11,11 +11,12 @@ class MgCamera
 {
     // Objects:
 private:
+    QMatrix4x4              axisMatrix;
     QMatrix4x4              projectionMatrix;
 
-    QMatrix4x4              axisMatrix;
     QVector3D               position;
-    QQuaternion             rotation;
+    QVector3D               lookAt;
+    QVector3D               up;
 
     // Functions:
 public:

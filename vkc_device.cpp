@@ -52,7 +52,7 @@ VkcDevice::VkcDevice(VkPhysicalDevice physicalDevice) : VkcDevice()
         uint32_t familyIdx = queueFamilies[i].index;
 
         // Set queue priorities.
-        int offset = queuePriorities.size();
+        uint32_t offset = queuePriorities.size();
         for (uint32_t i = 0; i < queueCount; i++)
             queuePriorities.append(1.0f);
 

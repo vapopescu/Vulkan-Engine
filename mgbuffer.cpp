@@ -15,7 +15,7 @@ VkResult MgBuffer::create(VkDeviceSize size, VkBufferUsageFlags usageMask, const
     VkBufferCreateInfo bufferInfo =
     {
         VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,   // VkStructureType        sType;
-        nullptr,                                   // const void*            pNext;
+        nullptr,                                // const void*            pNext;
         0,                                      // VkBufferCreateFlags    flags;
 
         size,                                   // VkDeviceSize           size;
@@ -27,7 +27,7 @@ VkResult MgBuffer::create(VkDeviceSize size, VkBufferUsageFlags usageMask, const
         queueFamilies.data()                    // const uint32_t*        pQueueFamilyIndices;
     };
 
-    mgAssert(vkCreateBuffer(device->logical, &bufferInfo, nullptr, &handle));
+    MG_ASSERT(vkCreateBuffer(device->logical, &bufferInfo, nullptr, &handle));
 
     // Get buffer memory requirements.
     VkMemoryRequirements memoryRequirements;
@@ -35,7 +35,7 @@ VkResult MgBuffer::create(VkDeviceSize size, VkBufferUsageFlags usageMask, const
 
     uint32_t memoryTypeIdx = 0;
     VkMemoryPropertyFlags memoryMask = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-    mgAssert(device->getMemoryTypeIndex(memoryMask, memoryRequirements, &memoryTypeIdx));
+    MG_ASSERT(device->getMemoryTypeIndex(memoryMask, memoryRequirements, &memoryTypeIdx));
 
     // Fill buffer memory allocate info.
     VkMemoryAllocateInfo memoryInfo =
@@ -48,10 +48,10 @@ VkResult MgBuffer::create(VkDeviceSize size, VkBufferUsageFlags usageMask, const
     };
 
     // Allocate buffer memory.
-    mgAssert(vkAllocateMemory(device->logical, &memoryInfo, nullptr, &memory));
+    MG_ASSERT(vkAllocateMemory(device->logical, &memoryInfo, nullptr, &memory));
 
     // Bind memory to buffer.
-    mgAssert(vkBindBufferMemory(device->logical, handle, memory, 0));
+    MG_ASSERT(vkBindBufferMemory(device->logical, handle, memory, 0));
 
     return VK_SUCCESS;
 }

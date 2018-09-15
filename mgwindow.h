@@ -36,7 +36,7 @@ private:
     VkcInstance     *vkcInstance;
 
     QTimer          *fpsTimer;
-    int             frameCount;
+    uint32_t        frameCount;
     QString         title;
 
 protected:

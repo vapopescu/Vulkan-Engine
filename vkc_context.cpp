@@ -77,8 +77,12 @@ void VkcContext::getCommandChains()
         vkGetPhysicalDeviceSurfaceSupportKHR(device->physical, family.index, surface, &ok);
 
         if (ok)
+        {
             for (int j = 0; j < family.queues.size(); j++)
+            {
                 commandChain.append({family.queues[j], family.commandBuffers[j]});
+            }
+        }
     }
 }
 

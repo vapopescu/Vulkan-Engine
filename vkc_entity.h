@@ -3,6 +3,7 @@
 
 #include "stable.h"
 #include "vkc_device.h"
+#include "vkc_context.h"
 #include "mgbuffer.h"
 #include "vkc_pipeline.h"
 
@@ -16,30 +17,35 @@ class VkcEntity
 {
     // Objects:
 protected:
-    QVector<VkVertex>           vertices;
+    QVector<MgVertex>           vertices;
     QVector<uint32_t>           indices;
 
     MgBuffer                    buffer;
 
-    QVector3D                   position;
-    QVector3D                   scale;
-    QQuaternion                 rotation;
+    QVector3D                   position =      QVector3D(0.0f, 0.0f, 0.0f);
+    QVector3D                   scale =         QVector3D(1.0f, 1.0f, 1.0f);
+    QQuaternion                 rotation =      QQuaternion(1.0f, 0.0f, 0.0f, 0.0f);
 
-    float                       dir;
+    MgImage                     diffuseMap;
+    MgImage                     normalMap;
+    MgImage                     specularMap;
+
+    const VkcDevice             *pDevice =      nullptr;
+
+    float                       dir =           1.0f / 60.0f;
 
     // Functions:
 public:
-    VkcEntity();
-    VkcEntity(
-            const VkcDevice     *device
+    VkResult create(
+            const VkcDevice     *pDevice,
+            QString             name
             );
-    ~VkcEntity();
+    void destroy();
 
-    void render(
+    VkResult render(
+            VkcContext          *pContext,
             VkCommandBuffer     commandBuffer,
-            MgBuffer           uniformBuffer,
-            QMatrix4x4          vpMatrix,
-            const VkcDevice     *device
+            QMatrix4x4          vpMatrix
             );
 };
 

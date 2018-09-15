@@ -2,17 +2,22 @@
 #define VKC_PIPELINE_H
 
 #include "stable.h"
+#include "mgimage.h"
+#include "mgbuffer.h"
 #include "vkc_device.h"
 #include "vkc_swapchain.h"
-
 
 /**
  * Struct used to define vertex shader input layout and buffer size.
  */
-struct VkVertex {
+struct MgVertex {
     float x, y, z;
-    float u, v;
+    float u, v, w;
     float nx, ny, nz;
+    float tx, ty, tz;
+    float bx, by, bz;
+    float i0, i1, i2, i3;
+    float w0, w1, w2, w3;
 };
 
 
@@ -33,10 +38,12 @@ public:
 
     VkDescriptorPool                descriptorPool;
     VkDescriptorSet                 descriptorSet;
-    VkDescriptorSetLayout           setLayout;
+    VkDescriptorSetLayout           descriptorSetLayout;
+
+    QHash<uint32_t, MgBuffer>       bindBuffers;
 
 private:
-    VkDevice                        logicalDevice;
+    const VkcDevice                 *pDevice;
 
     // Functions:
 public:
@@ -46,6 +53,17 @@ public:
             const VkcDevice         *device
             );
     ~VkcPipeline();
+
+    VkResult bindFloatv(
+            uint32_t                binding,
+            float                   *values,
+            uint32_t                size,
+            uint32_t                maxSize = 0
+            );
+    void bindImage(
+            uint32_t                binding,
+            MgImage                 image
+            );
 
 private:
     VkResult createShader(
