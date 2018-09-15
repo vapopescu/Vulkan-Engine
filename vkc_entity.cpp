@@ -28,7 +28,7 @@ VkResult VkcEntity::create(const VkcDevice *pDevice, QString name)
 
     const aiScene *scene = importer.ReadFileFromMemory(
                 fileData.data(),
-                fileData.size(),
+                static_cast<uint32_t>(fileData.size()),
                 aiProcess_JoinIdenticalVertices |
                 aiProcess_Triangulate |
                 aiProcess_SortByPType |
@@ -111,20 +111,21 @@ VkResult VkcEntity::create(const VkcDevice *pDevice, QString name)
     // TODO
 
     // Create buffer.
-    MG_ASSERT(buffer.create(vertices.size() * sizeof(MgVertex) + indices.size() * sizeof(uint32_t),
-                  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, pDevice));
+    MG_ASSERT(buffer.create(static_cast<uint32_t>(vertices.size()) * sizeof(MgVertex) +
+            static_cast<uint32_t>(indices.size()) * sizeof(uint32_t),
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, pDevice));
 
     // Map buffer memory to host.
     uint8_t *data;
-    MG_ASSERT(vkMapMemory(pDevice->logical, buffer.memory, 0, VK_WHOLE_SIZE, 0,(void**) &data));
+    MG_ASSERT(vkMapMemory(pDevice->logical, buffer.memory, 0, VK_WHOLE_SIZE, 0, reinterpret_cast<void **>(&data)));
 
     // Copy data to the buffer.
     uint32_t offset = 0;
-    uint32_t size = vertices.size() * sizeof(MgVertex);
+    uint32_t size = static_cast<uint32_t>(vertices.size()) * sizeof(MgVertex);
     memcpy(data + offset, vertices.data(), size);
 
     offset += size;
-    size = indices.size() * sizeof(uint32_t);
+    size = static_cast<uint32_t>(indices.size()) * sizeof(uint32_t);
     memcpy(data + offset, indices.data(), size);
 
     // Unmap memory.
@@ -198,11 +199,11 @@ VkResult VkcEntity::render(VkcContext *pContext, VkCommandBuffer commandBuffer, 
     // Calculate MVP matrix.
     QMatrix4x4 mvpMatrix = vpMatrix * modelMatrix;
 
-    MG_ASSERT(pContext->pipeline->bindFloatv(0, mvpMatrix.data(), sizeof(float[16])));
+    MG_ASSERT(pContext->pipeline->bindFloatv(0, mvpMatrix.data(), 16 * sizeof(float)));
 
     // Bind vertex and index bufffer.
     VkDeviceSize vboOffsets[] = {0};
-    uint32_t iboOffset = vertices.size() * sizeof(MgVertex);
+    uint32_t iboOffset = static_cast<uint32_t>(vertices.size()) * sizeof(MgVertex);
 
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, &buffer.handle, vboOffsets);
     vkCmdBindIndexBuffer(commandBuffer, buffer.handle, iboOffset, VK_INDEX_TYPE_UINT32);
@@ -212,7 +213,7 @@ VkResult VkcEntity::render(VkcContext *pContext, VkCommandBuffer commandBuffer, 
     pContext->pipeline->bindImage(11, normalMap);
 
     // Draw entity.
-    vkCmdDrawIndexed(commandBuffer, indices.size(), 1, 0, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
     return VK_SUCCESS;
 }

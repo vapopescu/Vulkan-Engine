@@ -14,17 +14,17 @@ VkResult MgBuffer::create(VkDeviceSize size, VkBufferUsageFlags usageMask, const
     // Fill buffer info.
     VkBufferCreateInfo bufferInfo =
     {
-        VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,   // VkStructureType        sType;
-        nullptr,                                // const void*            pNext;
-        0,                                      // VkBufferCreateFlags    flags;
+        VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,           // VkStructureType        sType;
+        nullptr,                                        // const void*            pNext;
+        0,                                              // VkBufferCreateFlags    flags;
 
-        size,                                   // VkDeviceSize           size;
-        usageMask,                              // VkBufferUsageFlags     usage;
+        size,                                           // VkDeviceSize           size;
+        usageMask,                                      // VkBufferUsageFlags     usage;
 
-        VK_SHARING_MODE_EXCLUSIVE,              // VkSharingMode          sharingMode;
+        VK_SHARING_MODE_EXCLUSIVE,                      // VkSharingMode          sharingMode;
 
-        (uint32_t)queueFamilies.count(),        // uint32_t               queueFamilyIndexCount;
-        queueFamilies.data()                    // const uint32_t*        pQueueFamilyIndices;
+        static_cast<uint32_t>(queueFamilies.count()),   // uint32_t               queueFamilyIndexCount;
+        queueFamilies.data()                            // const uint32_t*        pQueueFamilyIndices;
     };
 
     MG_ASSERT(vkCreateBuffer(device->logical, &bufferInfo, nullptr, &handle));
@@ -41,7 +41,7 @@ VkResult MgBuffer::create(VkDeviceSize size, VkBufferUsageFlags usageMask, const
     VkMemoryAllocateInfo memoryInfo =
     {
         VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,     // VkStructureType    sType;
-        nullptr,                                       // const void*        pNext;
+        nullptr,                                    // const void*        pNext;
 
         memoryRequirements.size,                    // VkDeviceSize       allocationSize;
         memoryTypeIdx                               // uint32_t           memoryTypeIndex;

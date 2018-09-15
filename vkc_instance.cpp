@@ -304,16 +304,16 @@ void VkcInstance::render()
     float gamma = GAMMA;
     context->pipeline->bindFloatv(5, &gamma, 1);
 
-    // Bind descriptor sets.
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout, 0,
-                            1, &pipeline->descriptorSet, 0, nullptr);
-
     // Get the view-projection matrix.
     QMatrix4x4 vpMatrix;
     camera.getViewProjectionMatrix(&vpMatrix);
 
     // Render our entities.
     sphere.render(context, commandBuffer, vpMatrix);
+
+    // Bind descriptor sets.
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout, 0,
+                            1, &pipeline->descriptorSet, 0, nullptr);
 
     // End render pass.
     vkCmdEndRenderPass(commandBuffer);

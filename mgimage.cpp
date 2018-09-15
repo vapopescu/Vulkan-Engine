@@ -31,9 +31,6 @@ VkResult MgImage::create(const VkcDevice *pDevice, MgImageInfo *pCreateInfo)
         usageMask = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
         layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
-    default:
-        break;
     }
 
     if (info.type == MG_IMAGE_TYPE_SWAPCHAIN_COLOR)
@@ -57,26 +54,26 @@ VkResult MgImage::create(const VkcDevice *pDevice, MgImageInfo *pCreateInfo)
         // Fill image create info.
         VkImageCreateInfo imageInfo =
         {
-            VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,    // VkStructureType          sType;
-            nullptr,                                // const void*              pNext;
-            0,                                      // VkImageCreateFlags       flags;
+            VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,            // VkStructureType          sType;
+            nullptr,                                        // const void*              pNext;
+            0,                                              // VkImageCreateFlags       flags;
 
-            imageType,                              // VkImageType              imageType;
-            info.format,                            // VkFormat                 format;
+            imageType,                                      // VkImageType              imageType;
+            info.format,                                    // VkFormat                 format;
 
-            info.extent,                            // VkExtent3D               extent;
-            mipLevels,                              // uint32_t                 mipLevels;
-            1,                                      // uint32_t                 arrayLayers;
+            info.extent,                                    // VkExtent3D               extent;
+            mipLevels,                                      // uint32_t                 mipLevels;
+            1,                                              // uint32_t                 arrayLayers;
 
-            VK_SAMPLE_COUNT_1_BIT,                  // VkSampleCountFlagBits    samples;
-            VK_IMAGE_TILING_OPTIMAL,                // VkImageTiling            tiling;
-            usageMask,                              // VkImageUsageFlags        usage;
-            VK_SHARING_MODE_EXCLUSIVE,              // VkSharingMode            sharingMode;
+            VK_SAMPLE_COUNT_1_BIT,                          // VkSampleCountFlagBits    samples;
+            VK_IMAGE_TILING_OPTIMAL,                        // VkImageTiling            tiling;
+            usageMask,                                      // VkImageUsageFlags        usage;
+            VK_SHARING_MODE_EXCLUSIVE,                      // VkSharingMode            sharingMode;
 
-            (uint32_t)queueFamilies.size(),         // uint32_t                 queueFamilyIndexCount;
-            queueFamilies.data(),                   // const uint32_t*          pQueueFamilyIndices;
+            static_cast<uint32_t>(queueFamilies.size()),    // uint32_t                 queueFamilyIndexCount;
+            queueFamilies.data(),                           // const uint32_t*          pQueueFamilyIndices;
 
-            VK_IMAGE_LAYOUT_UNDEFINED,              // VkImageLayout            initialLayout;
+            VK_IMAGE_LAYOUT_UNDEFINED,                      // VkImageLayout            initialLayout;
         };
 
         // Create image.
@@ -94,11 +91,11 @@ VkResult MgImage::create(const VkcDevice *pDevice, MgImageInfo *pCreateInfo)
         // Fill image memory allocate info.
         VkMemoryAllocateInfo memoryInfo =
         {
-            VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, // VkStructureType    sType;
-            nullptr,                                // const void*        pNext;
+            VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,         // VkStructureType    sType;
+            nullptr,                                        // const void*        pNext;
 
-            memoryRequirements.size,                // VkDeviceSize       allocationSize;
-            memoryTypeIdx                           // uint32_t           memoryTypeIndex;
+            memoryRequirements.size,                        // VkDeviceSize       allocationSize;
+            memoryTypeIdx                                   // uint32_t           memoryTypeIndex;
         };
 
         // Allocate image memory.
@@ -116,21 +113,21 @@ VkResult MgImage::create(const VkcDevice *pDevice, MgImageInfo *pCreateInfo)
         // Fill image view info.
         VkImageViewCreateInfo viewInfo =
         {
-            VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,   // VkStructureType            sType;
-            nullptr,                                    // const void*                pNext;
-            0,                                          // VkImageViewCreateFlags     flags;
+            VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,       // VkStructureType            sType;
+            nullptr,                                        // const void*                pNext;
+            0,                                              // VkImageViewCreateFlags     flags;
 
-            handle,                                     // VkImage                    image;
-            (VkImageViewType)imageType,                 // VkImageViewType            viewType;
-            info.format,                                // VkFormat                   format;
-            {  },                                       // VkComponentMapping         components;
+            handle,                                         // VkImage                    image;
+            static_cast<VkImageViewType>(imageType),        // VkImageViewType            viewType;
+            info.format,                                    // VkFormat                   format;
+            {  },                                           // VkComponentMapping         components;
 
-            {                                           // VkImageSubresourceRange    subresourceRange;
-                aspectMask,                                 // VkImageAspectFlags    aspectMask;
-                0,                                          // uint32_t              baseMipLevel;
-                VK_REMAINING_MIP_LEVELS,                    // uint32_t              levelCount;
-                0,                                          // uint32_t              baseArrayLayer;
-                VK_REMAINING_ARRAY_LAYERS,                  // uint32_t              layerCount;
+            {                                               // VkImageSubresourceRange    subresourceRange;
+                aspectMask,                                     // VkImageAspectFlags    aspectMask;
+                0,                                              // uint32_t              baseMipLevel;
+                VK_REMAINING_MIP_LEVELS,                        // uint32_t              levelCount;
+                0,                                              // uint32_t              baseArrayLayer;
+                VK_REMAINING_ARRAY_LAYERS,                      // uint32_t              layerCount;
             }
         };
 
@@ -145,30 +142,30 @@ VkResult MgImage::create(const VkcDevice *pDevice, MgImageInfo *pCreateInfo)
         // Fill sampler info.
         VkSamplerCreateInfo samplerInfo =
         {
-            VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,      // VkStructureType         sType;
-            nullptr,                                    // const void*             pNext;
-            0,                                          // VkSamplerCreateFlags    flags;
+            VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,          // VkStructureType         sType;
+            nullptr,                                        // const void*             pNext;
+            0,                                              // VkSamplerCreateFlags    flags;
 
-            VK_FILTER_LINEAR,                           // VkFilter                magFilter;
-            VK_FILTER_LINEAR,                           // VkFilter                minFilter;
-            VK_SAMPLER_MIPMAP_MODE_LINEAR,              // VkSamplerMipmapMode     mipmapMode;
+            VK_FILTER_LINEAR,                               // VkFilter                magFilter;
+            VK_FILTER_LINEAR,                               // VkFilter                minFilter;
+            VK_SAMPLER_MIPMAP_MODE_LINEAR,                  // VkSamplerMipmapMode     mipmapMode;
 
-            VK_SAMPLER_ADDRESS_MODE_REPEAT,             // VkSamplerAddressMode    addressModeU;
-            VK_SAMPLER_ADDRESS_MODE_REPEAT,             // VkSamplerAddressMode    addressModeV;
-            VK_SAMPLER_ADDRESS_MODE_REPEAT,             // VkSamplerAddressMode    addressModeW;
-            0.0f,                                       // float                   mipLodBias;
+            VK_SAMPLER_ADDRESS_MODE_REPEAT,                 // VkSamplerAddressMode    addressModeU;
+            VK_SAMPLER_ADDRESS_MODE_REPEAT,                 // VkSamplerAddressMode    addressModeV;
+            VK_SAMPLER_ADDRESS_MODE_REPEAT,                 // VkSamplerAddressMode    addressModeW;
+            0.0f,                                           // float                   mipLodBias;
 
-            anisotropy,                                 // VkBool32                anisotropyEnable;
-            anisotropy ? 8.0f : 1.0f,                   // float                   maxAnisotropy;
+            anisotropy,                                     // VkBool32                anisotropyEnable;
+            anisotropy ? 8.0f : 1.0f,                       // float                   maxAnisotropy;
 
-            VK_FALSE,                                   // VkBool32                compareEnable;
-            VK_COMPARE_OP_NEVER,                        // VkCompareOp             compareOp;
+            VK_FALSE,                                       // VkBool32                compareEnable;
+            VK_COMPARE_OP_NEVER,                            // VkCompareOp             compareOp;
 
-            0.0f,                                       // float                   minLod;
-            12.0f,                                      // float                   maxLod;
+            0.0f,                                           // float                   minLod;
+            12.0f,                                          // float                   maxLod;
 
-            VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,    // VkBorderColor           borderColor;
-            VK_FALSE,                                   // VkBool32                unnormalizedCoordinates;
+            VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,        // VkBorderColor           borderColor;
+            VK_FALSE,                                       // VkBool32                unnormalizedCoordinates;
         };
 
         // Create sampler.
@@ -226,25 +223,25 @@ void MgImage::changeLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkC
     // Setup image barrier.
     VkImageMemoryBarrier imageBarrier =
     {
-        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType            sType;
-        nullptr,                                // const void*                pNext;
+        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,     // VkStructureType            sType;
+        nullptr,                                    // const void*                pNext;
 
-        srcAccessMask,                          // VkAccessFlags              srcAccessMask;
-        dstAccessMask,                          // VkAccessFlags              dstAccessMask;
+        srcAccessMask,                              // VkAccessFlags              srcAccessMask;
+        dstAccessMask,                              // VkAccessFlags              dstAccessMask;
 
-        oldLayout,                              // VkImageLayout              oldLayout;
-        newLayout,                              // VkImageLayout              newLayout;
+        oldLayout,                                  // VkImageLayout              oldLayout;
+        newLayout,                                  // VkImageLayout              newLayout;
 
-        VK_QUEUE_FAMILY_IGNORED,                // uint32_t                   srcQueueFamilyIndex;
-        VK_QUEUE_FAMILY_IGNORED,                // uint32_t                   dstQueueFamilyIndex;
+        VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   srcQueueFamilyIndex;
+        VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   dstQueueFamilyIndex;
 
-        handle,                                 // VkImage                    image;
-        {                                       // VkImageSubresourceRange    subresourceRange;
-            aspectMask,                             // VkImageAspectFlags    aspectMask;
-            0,                                      // uint32_t              baseMipLevel;
-            VK_REMAINING_MIP_LEVELS,                // uint32_t              levelCount;
-            0,                                      // uint32_t              baseArrayLayer;
-            VK_REMAINING_ARRAY_LAYERS,              // uint32_t              layerCount;
+        handle,                                     // VkImage                    image;
+        {                                           // VkImageSubresourceRange    subresourceRange;
+            aspectMask,                                 // VkImageAspectFlags    aspectMask;
+            0,                                          // uint32_t              baseMipLevel;
+            VK_REMAINING_MIP_LEVELS,                    // uint32_t              levelCount;
+            0,                                          // uint32_t              baseArrayLayer;
+            VK_REMAINING_ARRAY_LAYERS,                  // uint32_t              layerCount;
         }
     };
 
@@ -268,9 +265,9 @@ VkResult MgImage::loadImage(MgBuffer *pImageBuffer)
     // Fill fence info.
     VkFenceCreateInfo fenceInfo =
     {
-        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,    // VkStructureType           sType;
-        nullptr,                                // const void*               pNext;
-        0                                       // VkFenceCreateFlags        flags;
+        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,            // VkStructureType           sType;
+        nullptr,                                        // const void*               pNext;
+        0                                               // VkFenceCreateFlags        flags;
     };
 
     // Create fence.
@@ -302,7 +299,7 @@ VkResult MgImage::loadImage(MgBuffer *pImageBuffer)
 
         // Copy from data buffer to image.
         vkCmdCopyBufferToImage(commandBuffer, pImageBuffer->handle, handle,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, regions.size(), regions.data());
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(regions.size()), regions.data());
     }
 
     // Change image layout to optimal.
@@ -358,7 +355,7 @@ VkResult MgImage::loadImageData(MgBuffer *pImageBuffer)
     if (!imageData.load(info.filePath))
     {
         qDebug(QString("ERROR:   [@qDebug]").leftJustified(32, ' ')
-               .append("- Image \"%1\" not found").arg(info.filePath).toStdString().c_str());
+                .append("- Image \"%1\" not found").arg(info.filePath).toStdString().c_str());
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -369,14 +366,15 @@ VkResult MgImage::loadImageData(MgBuffer *pImageBuffer)
     // Decide on the image extent.
     if (info.extent.width == 0 || info.extent.height == 0)
     {
-        info.extent.width = (uint32_t) imageData.width();
-        info.extent.height = (uint32_t) imageData.height();
+        info.extent.width = static_cast<uint32_t>(imageData.width());
+        info.extent.height = static_cast<uint32_t>(imageData.height());
     } else {
-        imageData = imageData.scaled(info.extent.width, info.extent.height, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        imageData = imageData.scaled(static_cast<int>(info.extent.width), static_cast<int>(info.extent.height),
+                Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     }
 
     // Compute the mip level number.
-    uint32_t maxDimension = imageData.width() > imageData.height() ? imageData.width() : imageData.height();
+    uint32_t maxDimension = static_cast<uint32_t>(imageData.width() > imageData.height() ? imageData.width() : imageData.height());
     mipLevels = 0;
 
     while (maxDimension > 0)
@@ -399,8 +397,8 @@ VkResult MgImage::loadImageData(MgBuffer *pImageBuffer)
     pImageBuffer->destroy();
 
     // Create image buffer.
-    uint32_t size = (imageData.width() + 1) * (imageData.height() + 1) * 4 * 4 / 3;
-    MG_ASSERT(pImageBuffer->create(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, pDevice));
+    int size = (imageData.width() + 1) * (imageData.height() + 1) * 4 * 4 / 3;
+    MG_ASSERT(pImageBuffer->create(static_cast<uint32_t>(size), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, pDevice));
 
     // Copy image data to the buffer.
     mipOffsets[0] = 0;
@@ -412,7 +410,7 @@ VkResult MgImage::loadImageData(MgBuffer *pImageBuffer)
             mipOffsets[mip] = mipOffsets[mip - 1] + mipSizes[mip - 1];
         }
 
-        mipSizes[mip] = imageData.byteCount();
+        mipSizes[mip] = static_cast<uint32_t>(imageData.byteCount());
 
         // Map buffer memory to host.
         void *data;
@@ -425,8 +423,8 @@ VkResult MgImage::loadImageData(MgBuffer *pImageBuffer)
         vkUnmapMemory(pDevice->logical, pImageBuffer->memory);
 
         // Fill region data.
-        uint32_t width = (uint32_t) imageData.width();
-        uint32_t height = (uint32_t) imageData.height();
+        uint32_t width = static_cast<uint32_t>(imageData.width());
+        uint32_t height = static_cast<uint32_t>(imageData.height());
 
         VkBufferImageCopy region  =
         {
@@ -455,7 +453,7 @@ VkResult MgImage::loadImageData(MgBuffer *pImageBuffer)
         width = width == 1 ? 1 : width / 2;
         height = height == 1 ? 1 : height / 2;
 
-        imageData = imageData.scaled(width, height, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        imageData = imageData.scaled(static_cast<int>(width), static_cast<int>(height), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     }
 
     // Deallocate mip data.

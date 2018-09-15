@@ -1,6 +1,6 @@
 #version 450
 
-layout(binding = 0) uniform MVPMatrix
+layout(set = 0, binding = 0) uniform Uniforms
 {
     mat4 matrix;
 } mvp;

@@ -61,7 +61,7 @@ VkcPipeline::VkcPipeline(const VkcSwapchain *swapchain, const VkcDevice *device)
         nullptr,                                                // const void*                            pNext;
         0,                                                      // VkDescriptorSetLayoutCreateFlags       flags;
 
-        (uint32_t)descriptorSetBindings.size(),                 // uint32_t                               bindingCount;
+        static_cast<uint32_t>(descriptorSetBindings.size()),    // uint32_t                               bindingCount;
         descriptorSetBindings.data()                            // const VkDescriptorSetLayoutBinding*    pBindings;
     };
 
@@ -96,7 +96,7 @@ VkcPipeline::VkcPipeline(const VkcSwapchain *swapchain, const VkcDevice *device)
         VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,      // VkDescriptorPoolCreateFlags    flags;
 
         1,                                                      // uint32_t                       maxSets;
-        (uint32_t)descriptorPoolSizes.size(),                   // uint32_t                       poolSizeCount;
+        static_cast<uint32_t>(descriptorPoolSizes.size()),      // uint32_t                       poolSizeCount;
         descriptorPoolSizes.data()                              // const VkDescriptorPoolSize*    pPoolSizes;
     };
 
@@ -211,7 +211,7 @@ VkcPipeline::VkcPipeline(const VkcSwapchain *swapchain, const VkcDevice *device)
         1,                                                              // uint32_t                                    vertexBindingDescriptionCount;
         &vertexBinding,                                                 // const VkVertexInputBindingDescription*      pVertexBindingDescriptions;
 
-        (uint32_t)vertexAttributes.size(),                              // uint32_t                                    vertexAttributeDescriptionCount;
+        static_cast<uint32_t>(vertexAttributes.size()),                 // uint32_t                                    vertexAttributeDescriptionCount;
         vertexAttributes.data()                                         // const VkVertexInputAttributeDescription*    pVertexAttributeDescriptions;
     };
 
@@ -257,7 +257,7 @@ VkcPipeline::VkcPipeline(const VkcSwapchain *swapchain, const VkcDevice *device)
         VK_FALSE,                                                   // VkBool32                                   depthClampEnable;
         VK_FALSE,                                                   // VkBool32                                   rasterizerDiscardEnable;
         VK_POLYGON_MODE_FILL,                                       // VkPolygonMode                              polygonMode;
-        VK_CULL_MODE_BACK_BIT,                                      // VkCullModeFlags                            cullMode;
+        VK_CULL_MODE_NONE,                                      // VkCullModeFlags                            cullMode;
         VK_FRONT_FACE_COUNTER_CLOCKWISE,                            // VkFrontFace                                frontFace;
 
         VK_FALSE,                                                   // VkBool32                                   depthBiasEnable;
@@ -366,7 +366,7 @@ VkcPipeline::VkcPipeline(const VkcSwapchain *swapchain, const VkcDevice *device)
         nullptr,                                                    // const void*                          pNext;
         0,                                                          // VkPipelineDynamicStateCreateFlags    flags;
 
-        (uint32_t)dynamicStates.count(),                            // uint32_t                             dynamicStateCount;
+        static_cast<uint32_t>(dynamicStates.count()),               // uint32_t                             dynamicStateCount;
         dynamicStates.data()                                        // const VkDynamicState*                pDynamicStates;
     };
 
@@ -378,7 +378,7 @@ VkcPipeline::VkcPipeline(const VkcSwapchain *swapchain, const VkcDevice *device)
         nullptr,                                                    // const void*                                      pNext;
         0,                                                          // VkPipelineCreateFlags                            flags;
 
-        (uint32_t)shaderStages.size(),                              // uint32_t                                         stageCount;
+        static_cast<uint32_t>(shaderStages.size()),                 // uint32_t                                         stageCount;
         shaderStages.data(),                                        // const VkPipelineShaderStageCreateInfo*           pStages;
 
         &vertexInfo,                                                // const VkPipelineVertexInputStateCreateInfo*      pVertexInputState;
@@ -454,7 +454,7 @@ VkcPipeline::~VkcPipeline()
     }
 }
 
-VkResult VkcPipeline::bindFloatv(uint32_t binding, float *values, uint32_t size, uint32_t maxSize)
+VkResult VkcPipeline::bindFloatv(uint32_t binding, float values[], uint32_t size, uint32_t maxSize)
 {
     // If max size is not specified, set it to minimum.
     if (maxSize == 0)
@@ -576,12 +576,12 @@ VkResult VkcPipeline::createShader(VkShaderModule &shader, QString fileName, con
     // Fill shader module info.
     VkShaderModuleCreateInfo shaderInfo =
     {
-        VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,    // VkStructureType              sType;
-        nullptr,                                        // const void*                  pNext;
-        0,                                              // VkShaderModuleCreateFlags    flags;
+        VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,        // VkStructureType              sType;
+        nullptr,                                            // const void*                  pNext;
+        0,                                                  // VkShaderModuleCreateFlags    flags;
 
-        (size_t)shaderData.size(),                      // size_t                       codeSize;
-        (const uint32_t*)shaderData.data()              // const uint32_t*              pCode;
+        static_cast<size_t>(shaderData.size()),             // size_t                       codeSize;
+        reinterpret_cast<uint32_t *>(shaderData.data())     // const uint32_t*              pCode;
     };
 
     // Create shader module.

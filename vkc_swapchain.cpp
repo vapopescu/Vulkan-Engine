@@ -131,7 +131,7 @@ void VkcSwapchain::createSwapchain(VkSurfaceKHR surface, const VkcDevice *device
 
     VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
     imageCount = 2;
-    for (int i = 0; i < presentModes.size(); i++)
+    /*for (int i = 0; i < presentModes.size(); i++)
     {
         if (presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
         {
@@ -139,7 +139,7 @@ void VkcSwapchain::createSwapchain(VkSurfaceKHR surface, const VkcDevice *device
             imageCount = 3;
             break;
         }
-    }
+    }*/
 
     if (imageCount < surfaceCapabilities.minImageCount)
     {
