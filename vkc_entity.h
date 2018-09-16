@@ -32,7 +32,7 @@ protected:
 
     const VkcDevice             *pDevice =      nullptr;
 
-    float                       dir =           1.0f / 60.0f;
+    float                       dir =           1.0f;
 
     // Functions:
 public:
@@ -45,7 +45,8 @@ public:
     VkResult render(
             VkcContext          *pContext,
             VkCommandBuffer     commandBuffer,
-            QMatrix4x4          vpMatrix
+            QMatrix4x4          vpMatrix,
+            float               delta
             );
 };
 

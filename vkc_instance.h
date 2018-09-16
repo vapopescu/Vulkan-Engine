@@ -10,8 +10,8 @@
 #include "mgimage.h"
 
 #define PROC(NAME) PFN_vk##NAME pf##NAME = nullptr
-#define GET_IPROC(INSTANCE, NAME) pf##NAME = (PFN_vk##NAME)vkGetInstanceProcAddr(INSTANCE, "vk" #NAME)
-#define GET_DPROC(INSTANCE, NAME) pf##NAME = (PFN_vk##NAME)vkGetDeviceProcAddr(INSTANCE, "vk" #NAME)
+#define GET_IPROC(INSTANCE, NAME) pf##NAME = reinterpret_cast<PFN_vk##NAME>(vkGetInstanceProcAddr(INSTANCE, "vk" #NAME))
+#define GET_DPROC(INSTANCE, NAME) pf##NAME = reinterpret_cast<PFN_vk##NAME>(vkGetDeviceProcAddr(INSTANCE, "vk" #NAME))
 
 /**
  * Class used as the Vulkan instance.
@@ -42,6 +42,8 @@ private:
     VkcEntity                   sphere;
 
     VkDebugReportCallbackEXT    debugReport;
+
+    QElapsedTimer               timer;
 
 #ifdef QT_DEBUG
     PROC(CreateDebugReportCallbackEXT);

@@ -28,7 +28,7 @@ public:
 
 protected:
     QVector<VkSurfaceFormatKHR>     surfaceFormats;
-    uint32_t                        imageCount;
+    int                             imageCount;
     const VkcDevice                 *device;
 
     // Functions:

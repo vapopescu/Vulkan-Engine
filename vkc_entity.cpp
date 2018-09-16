@@ -111,13 +111,13 @@ VkResult VkcEntity::create(const VkcDevice *pDevice, QString name)
     // TODO
 
     // Create buffer.
-    MG_ASSERT(buffer.create(static_cast<uint32_t>(vertices.size()) * sizeof(MgVertex) +
+    mgAssert(buffer.create(static_cast<uint32_t>(vertices.size()) * sizeof(MgVertex) +
             static_cast<uint32_t>(indices.size()) * sizeof(uint32_t),
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, pDevice));
 
     // Map buffer memory to host.
     uint8_t *data;
-    MG_ASSERT(vkMapMemory(pDevice->logical, buffer.memory, 0, VK_WHOLE_SIZE, 0, reinterpret_cast<void **>(&data)));
+    mgAssert(vkMapMemory(pDevice->logical, buffer.memory, 0, VK_WHOLE_SIZE, 0, reinterpret_cast<void **>(&data)));
 
     // Copy data to the buffer.
     uint32_t offset = 0;
@@ -145,7 +145,7 @@ VkResult VkcEntity::create(const VkcDevice *pDevice, QString name)
     };
 
     // Create the diffuse map.
-    MG_ASSERT(diffuseMap.create(pDevice, &diffuseMapInfo));
+    mgAssert(diffuseMap.create(pDevice, &diffuseMapInfo));
 
     // Fill the normal map info.
     MgImageInfo normalMapInfo =
@@ -161,7 +161,7 @@ VkResult VkcEntity::create(const VkcDevice *pDevice, QString name)
     };
 
     // Create the normal map.
-    MG_ASSERT(normalMap.create(pDevice, &normalMapInfo));
+    mgAssert(normalMap.create(pDevice, &normalMapInfo));
 
     return VK_SUCCESS;
 }
@@ -181,14 +181,20 @@ void VkcEntity::destroy()
 /**
  * Register the commands that render the entity.
  */
-VkResult VkcEntity::render(VkcContext *pContext, VkCommandBuffer commandBuffer, QMatrix4x4 vpMatrix)
+VkResult VkcEntity::render(VkcContext *pContext, VkCommandBuffer commandBuffer, QMatrix4x4 vpMatrix, float delta)
 {
     // Wiggle, wiggle, wiggle.
-    position += QVector3D(dir, 0.0f, 0.0f);
+    position += QVector3D(dir * delta, 0.0f, 0.0f);
     float pos = position.x();
 
-    if(pos > 0.5f || pos < -0.5f)
-        dir *= -1.0f;
+    if(pos > 0.5f)
+    {
+        dir = -1.0f;
+    }
+    else if (pos < -0.5f)
+    {
+        dir = 1.0f;
+    }
 
     // Calculate model matrix.
     QMatrix4x4 modelMatrix;
@@ -199,7 +205,7 @@ VkResult VkcEntity::render(VkcContext *pContext, VkCommandBuffer commandBuffer, 
     // Calculate MVP matrix.
     QMatrix4x4 mvpMatrix = vpMatrix * modelMatrix;
 
-    MG_ASSERT(pContext->pipeline->bindFloatv(0, mvpMatrix.data(), 16 * sizeof(float)));
+    mgAssert(pContext->pipeline->bindFloatv(0, mvpMatrix.data(), 16 * sizeof(float)));
 
     // Bind vertex and index bufffer.
     VkDeviceSize vboOffsets[] = {0};
@@ -211,6 +217,10 @@ VkResult VkcEntity::render(VkcContext *pContext, VkCommandBuffer commandBuffer, 
     // Bind the textures.
     pContext->pipeline->bindImage(10, diffuseMap);
     pContext->pipeline->bindImage(11, normalMap);
+
+    // Bind descriptor sets.
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pContext->pipeline->layout, 0,
+            1, &pContext->pipeline->descriptorSet, 0, nullptr);
 
     // Draw entity.
     vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);

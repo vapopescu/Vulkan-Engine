@@ -1,12 +1,12 @@
 #include "vkc_instance.h"
 
-#define NV_VERSION_MAJOR(version) ((uint32_t)(version) >> 22)
-#define NV_VERSION_MINOR(version) (((uint32_t)(version) >> 14) & 0xff)
-#define NV_VERSION_PATCH(version) ((uint32_t)(version) & 0x3ff)
+#define NV_VERSION_MAJOR(version) (static_cast<uint32_t>(version) >> 22)
+#define NV_VERSION_MINOR(version) ((static_cast<uint32_t>(version) >> 14) & 0xff)
+#define NV_VERSION_PATCH(version) (static_cast<uint32_t>(version) & 0x3ff)
 
-#define AMD_VERSION_MAJOR(version) ((uint32_t)(version) >> 18)
-#define AMD_VERSION_MINOR(version) (((uint32_t)(version) >> 12) & 0x3f)
-#define AMD_VERSION_PATCH(version) ((uint32_t)(version) & 0x1ff)
+#define AMD_VERSION_MAJOR(version) (static_cast<uint32_t>(version) >> 18)
+#define AMD_VERSION_MINOR(version) ((static_cast<uint32_t>(version) >> 12) & 0x3f)
+#define AMD_VERSION_PATCH(version) (static_cast<uint32_t>(version) & 0x1ff)
 
 #define GAMMA 2.2f
 
@@ -18,16 +18,18 @@ VkcInstance::VkcInstance(QWidget *parent) : QObject(parent)
     createInstance();
     getDevices();
 
-    context = new VkcContext((uint32_t)parent->winId(), devices[0], instance);
+    context = new VkcContext(static_cast<uint32_t>(parent->winId()), devices[0], instance);
 
     sphere.create(devices[0], "sphere");
 
-    width =     parent->width();
-    height =    parent->height();
+    width =     static_cast<uint32_t>(parent->width());
+    height =    static_cast<uint32_t>(parent->height());
 
-    camera.setProjectionMatrix(3.1416f / 2, (float)width / (float)height, 1, 100);
+    camera.setProjectionMatrix(3.1416f / 2, static_cast<float>(width) / static_cast<float>(height), 1, 100);
 
     setupRender(devices[0]);
+
+    timer.start();
 }
 
 
@@ -106,16 +108,16 @@ void VkcInstance::createInstance()
     // Fill application info.
     VkApplicationInfo applicationInfo =
     {
-        VK_STRUCTURE_TYPE_APPLICATION_INFO,         // VkStructureType    sType;
-        nullptr,                                       // const void*        pNext;
+        VK_STRUCTURE_TYPE_APPLICATION_INFO,             // VkStructureType    sType;
+        nullptr,                                        // const void*        pNext;
 
-        "Magma Engine Demo",                        // const char*        pApplicationName;
-        VK_MAKE_VERSION(0, 10, 0),                  // uint32_t           applicationVersion;
+        "Magma Engine Demo",                            // const char*        pApplicationName;
+        VK_MAKE_VERSION(0, 10, 0),                      // uint32_t           applicationVersion;
 
-        "Magma Engine",                             // const char*        pEngineName;
-        VK_MAKE_VERSION(0, 10, 0),                  // uint32_t           engineVersion;
+        "Magma Engine",                                 // const char*        pEngineName;
+        VK_MAKE_VERSION(0, 10, 0),                      // uint32_t           engineVersion;
 
-        VK_MAKE_VERSION(1, 0, VK_HEADER_VERSION)    // uint32_t           apiVersion;
+        VK_MAKE_VERSION(1, 0, VK_HEADER_VERSION)        // uint32_t           apiVersion;
     } ;
 
     // Setup instance layers and extentions.
@@ -138,18 +140,18 @@ void VkcInstance::createInstance()
     // Fill debug report callback info.
     VkDebugReportCallbackCreateInfoEXT  debugReportInfo =
     {
-        VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,    // VkStructureType                 sType;
-        nullptr,                                                    // const void*                     pNext;
-        0 |                                                         // VkDebugReportFlagsEXT           flags;
+        VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,        // VkStructureType                 sType;
+        nullptr,                                                        // const void*                     pNext;
+        0 |                                                             // VkDebugReportFlagsEXT           flags;
         // VK_DEBUG_REPORT_INFORMATION_BIT_EXT |
         VK_DEBUG_REPORT_WARNING_BIT_EXT |
         VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
         VK_DEBUG_REPORT_ERROR_BIT_EXT |
-        // VK_DEBUG_REPORT_DEBUG_BIT_EXT |
+        VK_DEBUG_REPORT_DEBUG_BIT_EXT |
         0,
 
-        (PFN_vkDebugReportCallbackEXT)mgDebugCallback,              // PFN_vkDebugReportCallbackEXT    pfnCallback;
-        nullptr                                                     // void*                           pUserData;
+        static_cast<PFN_vkDebugReportCallbackEXT>(mgDebugCallback),     // PFN_vkDebugReportCallbackEXT    pfnCallback;
+        nullptr                                                         // void*                           pUserData;
     };
 
     void *pDebugReportInfo = &debugReportInfo;
@@ -160,17 +162,17 @@ void VkcInstance::createInstance()
     // Fill instance info.
     VkInstanceCreateInfo instanceInfo =
     {
-        VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,     // VkStructureType             sType;
-        pDebugReportInfo,                           // const void*                 pNext;
-        0,                                          // VkInstanceCreateFlags       flags;
+        VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,                 // VkStructureType             sType;
+        pDebugReportInfo,                                       // const void*                 pNext;
+        0,                                                      // VkInstanceCreateFlags       flags;
 
-        &applicationInfo,                           // const VkApplicationInfo*    pApplicationInfo;
+        &applicationInfo,                                       // const VkApplicationInfo*    pApplicationInfo;
 
-        (uint32_t)instanceLayers.size(),            // uint32_t                    enabledLayerCount;
-        instanceLayers.data(),                      // const char* const*          ppEnabledLayerNames;
+        static_cast<uint32_t>(instanceLayers.size()),           // uint32_t                    enabledLayerCount;
+        instanceLayers.data(),                                  // const char* const*          ppEnabledLayerNames;
 
-        (uint32_t)instanceExtentions.size(),        // uint32_t                    enabledExtensionCount;
-        instanceExtentions.data(),                  // const char* const*          ppEnabledExtensionNames;
+        static_cast<uint32_t>(instanceExtentions.size()),       // uint32_t                    enabledExtensionCount;
+        instanceExtentions.data(),                              // const char* const*          ppEnabledExtensionNames;
     };
 
     // Create instance.
@@ -198,7 +200,7 @@ void VkcInstance::getDevices()
 
     // Get the device list.
     QVector<VkPhysicalDevice> physicalDevices, vector;
-    physicalDevices.resize(deviceCount);
+    physicalDevices.resize(static_cast<int>(deviceCount));
     vkEnumeratePhysicalDevices(instance, &deviceCount, physicalDevices.data());
 
     for (int i = 0; i < physicalDevices.size(); i++)
@@ -229,6 +231,10 @@ void VkcInstance::getDevices()
  */
 void VkcInstance::render()
 {
+    // Calculate time delta from last frame in seconds.
+    float delta = timer.nsecsElapsed() * 1e-9f;
+    timer.start();
+
     // Get the queue and command buffer.
     // TODO For this thread.
     const VkcDevice         *device =           context->device;
@@ -238,8 +244,9 @@ void VkcInstance::render()
     VkCommandBuffer         commandBuffer =     context->commandChain[0].buffer;
 
     // Get the next image available.
-    uint32_t nextImageIdx;
-    VkResult result = vkAcquireNextImageKHR(device->logical, swapchain->handle, UINT64_MAX, sphAcquire, VK_NULL_HANDLE, &nextImageIdx);
+    int nextImageIdx;
+    VkResult result = vkAcquireNextImageKHR(device->logical, swapchain->handle,
+            UINT64_MAX, sphAcquire, VK_NULL_HANDLE, reinterpret_cast<uint32_t *>(&nextImageIdx));
     // TODO Solve VK_ERROR_OUT_OF_DATE_KHR when resizing.
     MgImage *nextImage = swapchain->colorImages[nextImageIdx];
 
@@ -268,7 +275,16 @@ void VkcInstance::render()
 
         swapchain->renderPass,                          // VkRenderPass           renderPass;
         swapchain->framebuffers[nextImageIdx],          // VkFramebuffer          framebuffer;
-        {0, 0, width, height},                          // VkRect2D               renderArea;
+        {                                               // VkRect2D               renderArea;
+            {                                               // VkOffset2D    offset;
+                0,                                              // int32_t    x;
+                0                                               // int32_t    y;
+            },
+            {                                               // VkExtent2D    extent;
+                static_cast<uint32_t>(width),                   // uint32_t    width;
+                static_cast<uint32_t>(height)                   // uint32_t    height;
+            }
+        },
         2,                                              // uint32_t               clearValueCount;
         swapchain->clearValues                          // const VkClearValue*    pClearValues;
     };
@@ -282,12 +298,12 @@ void VkcInstance::render()
     // Resolve dynamic states.
     VkViewport viewport =
     {
-        0.0f,               // float    x;
-        0.0f,               // float    y;
-        (float)width,       // float    width;
-        (float)height,      // float    height;
-        0.0f,               // float    minDepth;
-        1.0f                // float    maxDepth;
+        0.0f,                           // float    x;
+        0.0f,                           // float    y;
+        static_cast<float>(width),      // float    width;
+        static_cast<float>(height),     // float    height;
+        0.0f,                           // float    minDepth;
+        1.0f                            // float    maxDepth;
     };
 
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
@@ -309,11 +325,7 @@ void VkcInstance::render()
     camera.getViewProjectionMatrix(&vpMatrix);
 
     // Render our entities.
-    sphere.render(context, commandBuffer, vpMatrix);
-
-    // Bind descriptor sets.
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout, 0,
-                            1, &pipeline->descriptorSet, 0, nullptr);
+    sphere.render(context, commandBuffer, vpMatrix, delta);
 
     // End render pass.
     vkCmdEndRenderPass(commandBuffer);
@@ -329,7 +341,7 @@ void VkcInstance::render()
     VkSubmitInfo submitInfo =
     {
         VK_STRUCTURE_TYPE_SUBMIT_INFO,      // VkStructureType                sType;
-        nullptr,                               // const void*                    pNext;
+        nullptr,                            // const void*                    pNext;
 
         1,                                  // uint32_t                       waitSemaphoreCount;
         &sphAcquire,                        // const VkSemaphore*             pWaitSemaphores;
@@ -354,17 +366,17 @@ void VkcInstance::render()
     // Fill queue present info.
     VkPresentInfoKHR presentInfo =
     {
-        VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, // VkStructureType          sType;
-        nullptr,                               // const void*              pNext;
+        VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,                 // VkStructureType          sType;
+        nullptr,                                            // const void*              pNext;
 
-        1,                                  // uint32_t                 waitSemaphoreCount;
-        &sphRender,                         // const VkSemaphore*       pWaitSemaphores;
+        1,                                                  // uint32_t                 waitSemaphoreCount;
+        &sphRender,                                         // const VkSemaphore*       pWaitSemaphores;
 
-        1,                                  // uint32_t                 swapchainCount;
-        &swapchain->handle,                 // const VkSwapchainKHR*    pSwapchains;
+        1,                                                  // uint32_t                 swapchainCount;
+        &swapchain->handle,                                 // const VkSwapchainKHR*    pSwapchains;
 
-        &nextImageIdx,                      // const uint32_t*          pImageIndices;
-        &result                             // VkResult*                pResults;
+        reinterpret_cast<uint32_t *>(&nextImageIdx),        // const uint32_t*          pImageIndices;
+        &result                                             // VkResult*                pResults;
     };
 
     // Now present.
@@ -377,18 +389,18 @@ void VkcInstance::render()
  */
 void VkcInstance::resize()
 {
-    QWidget *parent = (QWidget*)this->parent();
-    if (width != (uint32_t)parent->width() || height != (uint32_t)parent->height())
+    QWidget *parent = static_cast<QWidget*>(this->parent());
+    if (width != static_cast<uint32_t>(parent->width()) || height != static_cast<uint32_t>(parent->height()))
     {
         // Update resolution fields.
-        width = parent->width();
-        height = parent->height();
+        width = static_cast<uint32_t>(parent->width());
+        height = static_cast<uint32_t>(parent->height());
 
         // Resize context.
         context->resize();
 
         // Update projection matrix.
-        camera.setProjectionMatrix(3.1416f / 2, (float)width / (float)height, 1, 100);
+        camera.setProjectionMatrix(3.1416f / 2, static_cast<float>(width) / static_cast<float>(height), 1, 100);
     }
 }
 

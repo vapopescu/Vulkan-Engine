@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QFile>
 #include <QTimer>
+#include <QElapsedTimer>
 #include <QVector>
 #include <QImage>
 #include <QPainter>
@@ -34,7 +35,7 @@
 #include <assimp\postprocess.h>
 
 // Custom
-#define MG_ASSERT(result) \
+#define mgAssert(result) \
 { \
     if (result < 0) \
     { \
@@ -44,5 +45,7 @@
         return result; \
     } \
 }
+
+#define mgOffsetOf(s,m) (reinterpret_cast<size_t>(&((static_cast<s*>(nullptr))->m)))
 
 #endif // STABLE_H

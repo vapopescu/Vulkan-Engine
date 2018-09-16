@@ -56,7 +56,7 @@ void VkcContext::createSurface(uint64_t id)
         0,                                                  // VkWin32SurfaceCreateFlagsKHR    flags;
 
         nullptr,                                            // HINSTANCE                       hinstance;
-        (HWND)id                                            // HWND                            hwnd;
+        reinterpret_cast<HWND>(id)                          // HWND                            hwnd;
     };
 
     // Create surface.

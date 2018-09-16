@@ -9,8 +9,8 @@ VkcSwapchain::VkcSwapchain()
     handle =                VK_NULL_HANDLE;
     renderPass =            VK_NULL_HANDLE;
 
-    clearValues[0] =        {0.8f, 0.8f, 1.0f, 1.0f};
-    clearValues[1] =        {0.0f, 0};
+    clearValues[0] =        {{{0.8f, 0.8f, 1.0f, 1.0f}}};
+    clearValues[1] =        {{{0.0f, 0}}};
 
     imageCount =            0;
 }
@@ -92,7 +92,7 @@ void VkcSwapchain::createSwapchain(VkSurfaceKHR surface, const VkcDevice *device
 
     // Get surface formats.
     surfaceFormats.clear();
-    surfaceFormats.resize(formatCount);
+    surfaceFormats.resize(static_cast<int>(formatCount));
     vkGetPhysicalDeviceSurfaceFormatsKHR(device->physical, surface, &formatCount, surfaceFormats.data());
 
     if  (surfaceFormats.size() == 1 && surfaceFormats[0].format == VK_FORMAT_UNDEFINED)
@@ -126,12 +126,12 @@ void VkcSwapchain::createSwapchain(VkSurfaceKHR surface, const VkcDevice *device
 
     // Get present modes.
     QVector<VkPresentModeKHR> presentModes;
-    presentModes.resize(modeCount);
+    presentModes.resize(static_cast<int>(modeCount));
     vkGetPhysicalDeviceSurfacePresentModesKHR(device->physical, surface, &modeCount, presentModes.data());
 
     VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
     imageCount = 2;
-    /*for (int i = 0; i < presentModes.size(); i++)
+    for (int i = 0; i < presentModes.size(); i++)
     {
         if (presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
         {
@@ -139,15 +139,15 @@ void VkcSwapchain::createSwapchain(VkSurfaceKHR surface, const VkcDevice *device
             imageCount = 3;
             break;
         }
-    }*/
-
-    if (imageCount < surfaceCapabilities.minImageCount)
-    {
-        imageCount = surfaceCapabilities.minImageCount;
     }
-    if (imageCount > surfaceCapabilities.maxImageCount && surfaceCapabilities.maxImageCount != 0)
+
+    if (imageCount < static_cast<int>(surfaceCapabilities.minImageCount))
     {
-        imageCount = surfaceCapabilities.maxImageCount;
+        imageCount = static_cast<int>(surfaceCapabilities.minImageCount);
+    }
+    if (imageCount > static_cast<int>(surfaceCapabilities.maxImageCount) && surfaceCapabilities.maxImageCount != 0)
+    {
+        imageCount = static_cast<int>(surfaceCapabilities.maxImageCount);
     }
 
     // Get queue families.
@@ -157,30 +157,30 @@ void VkcSwapchain::createSwapchain(VkSurfaceKHR surface, const VkcDevice *device
     // Fill swap chain info.
     VkSwapchainCreateInfoKHR swapchainInfo =
     {
-        VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,    // VkStructureType                  sType;
-        nullptr,                                           // const void*                      pNext;
-        0,                                              // VkSwapchainCreateFlagsKHR        flags;
+        VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,        // VkStructureType                  sType;
+        nullptr,                                            // const void*                      pNext;
+        0,                                                  // VkSwapchainCreateFlagsKHR        flags;
 
-        surface,                                        // VkSurfaceKHR                     surface;
-        imageCount,                                     // uint32_t                         minImageCount;
+        surface,                                            // VkSurfaceKHR                     surface;
+        static_cast<uint32_t>(imageCount),                  // uint32_t                         minImageCount;
 
-        surfaceFormats[0].format,                       // VkFormat                         imageFormat;
-        surfaceFormats[0].colorSpace,                   // VkColorSpaceKHR                  imageColorSpace;
+        surfaceFormats[0].format,                           // VkFormat                         imageFormat;
+        surfaceFormats[0].colorSpace,                       // VkColorSpaceKHR                  imageColorSpace;
 
-        extent,                                         // VkExtent2D                       imageExtent;
-        1,                                              // uint32_t                         imageArrayLayers;
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |           // VkImageUsageFlags                imageUsage;
+        extent,                                             // VkExtent2D                       imageExtent;
+        1,                                                  // uint32_t                         imageArrayLayers;
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |               // VkImageUsageFlags                imageUsage;
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-        VK_SHARING_MODE_EXCLUSIVE,                      // VkSharingMode                    imageSharingMode;
+        VK_SHARING_MODE_EXCLUSIVE,                          // VkSharingMode                    imageSharingMode;
 
-        (uint32_t)queueFamilies.count(),                // uint32_t                         queueFamilyIndexCount;
-        queueFamilies.data(),                           // const uint32_t*                  pQueueFamilyIndices;
+        static_cast<uint32_t>(queueFamilies.count()),       // uint32_t                         queueFamilyIndexCount;
+        queueFamilies.data(),                               // const uint32_t*                  pQueueFamilyIndices;
 
-        preTransform,                                   // VkSurfaceTransformFlagBitsKHR    preTransform;
-        VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,              // VkCompositeAlphaFlagBitsKHR      compositeAlpha;
-        presentMode,                                    // VkPresentModeKHR                 presentMode;
-        VK_TRUE,                                        // VkBool32                         clipped;
-        VK_NULL_HANDLE                                  // VkSwapchainKHR                   oldSwapchain;
+        preTransform,                                       // VkSurfaceTransformFlagBitsKHR    preTransform;
+        VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,                  // VkCompositeAlphaFlagBitsKHR      compositeAlpha;
+        presentMode,                                        // VkPresentModeKHR                 presentMode;
+        VK_TRUE,                                            // VkBool32                         clipped;
+        VK_NULL_HANDLE                                      // VkSwapchainKHR                   oldSwapchain;
     };
 
     // Create swap chain.
@@ -194,16 +194,16 @@ void VkcSwapchain::createSwapchain(VkSurfaceKHR surface, const VkcDevice *device
 void VkcSwapchain::createImages()
 {
     // Get actual image number.
-    vkGetSwapchainImagesKHR(device->logical, handle, &imageCount, nullptr);
+    vkGetSwapchainImagesKHR(device->logical, handle, reinterpret_cast<uint32_t *>(&imageCount), nullptr);
 
     // Get images.
     QVector<VkImage> images;
     images.resize(imageCount);
     colorImages.resize(imageCount);
-    vkGetSwapchainImagesKHR(device->logical, handle, &imageCount, images.data());
+    vkGetSwapchainImagesKHR(device->logical, handle, reinterpret_cast<uint32_t *>(&imageCount), images.data());
 
     // Create color images.
-    for (uint32_t i = 0; i < imageCount; i++)
+    for (int i = 0; i < imageCount; i++)
     {
         MgImageInfo colorImageInfo =
         {
@@ -369,7 +369,7 @@ void VkcSwapchain::createFramebuffers()
 
     // Create a framebuffer for each image in the swap chain.
     framebuffers.resize(imageCount);
-    for (uint32_t i = 0; i < imageCount; i++)
+    for (int i = 0; i < imageCount; i++)
     {
         attachments[0] = colorImages[i]->view;
 

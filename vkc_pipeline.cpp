@@ -171,33 +171,33 @@ VkcPipeline::VkcPipeline(const VkcSwapchain *swapchain, const VkcDevice *device)
     // Fill vertex input binding description.
     VkVertexInputBindingDescription vertexBinding =
     {
-        0,                                      // uint32_t             binding;
-        sizeof(MgVertex),                       // uint32_t             stride;
-        VK_VERTEX_INPUT_RATE_VERTEX,            // VkVertexInputRate    inputRate;
+        0,                                                      // uint32_t             binding;
+        sizeof(MgVertex),                                       // uint32_t             stride;
+        VK_VERTEX_INPUT_RATE_VERTEX,                            // VkVertexInputRate    inputRate;
     };
 
     // Fill vertex input attribute description.
     QVector<VkVertexInputAttributeDescription> vertexAttributes =
     {
         {
-            0,                                  // uint32_t    location;
-            0,                                  // uint32_t    binding;
-            VK_FORMAT_R32G32B32_SFLOAT,         // VkFormat    format;
-            offsetof(MgVertex, x)               // uint32_t    offset;
+            0,                                                  // uint32_t    location;
+            0,                                                  // uint32_t    binding;
+            VK_FORMAT_R32G32B32_SFLOAT,                         // VkFormat    format;
+            static_cast<uint32_t>(mgOffsetOf(MgVertex, x))      // uint32_t    offset;
         },
 
         {
-            1,                                  // uint32_t    location;
-            0,                                  // uint32_t    binding;
-            VK_FORMAT_R32G32_SFLOAT,            // VkFormat    format;
-            offsetof(MgVertex, u)               // uint32_t    offset;
+            1,                                                  // uint32_t    location;
+            0,                                                  // uint32_t    binding;
+            VK_FORMAT_R32G32_SFLOAT,                            // VkFormat    format;
+            static_cast<uint32_t>(mgOffsetOf(MgVertex, u))      // uint32_t    offset;
         },
 
         {
-            2,                                  // uint32_t    location;
-            0,                                  // uint32_t    binding;
-            VK_FORMAT_R32G32B32_SFLOAT,         // VkFormat    format;
-            offsetof(MgVertex, nx)              // uint32_t    offset;
+            2,                                                  // uint32_t    location;
+            0,                                                  // uint32_t    binding;
+            VK_FORMAT_R32G32B32_SFLOAT,                         // VkFormat    format;
+            static_cast<uint32_t>(mgOffsetOf(MgVertex, nx))     // uint32_t    offset;
         }
     };
 
@@ -257,7 +257,7 @@ VkcPipeline::VkcPipeline(const VkcSwapchain *swapchain, const VkcDevice *device)
         VK_FALSE,                                                   // VkBool32                                   depthClampEnable;
         VK_FALSE,                                                   // VkBool32                                   rasterizerDiscardEnable;
         VK_POLYGON_MODE_FILL,                                       // VkPolygonMode                              polygonMode;
-        VK_CULL_MODE_NONE,                                      // VkCullModeFlags                            cullMode;
+        VK_CULL_MODE_BACK_BIT,                                      // VkCullModeFlags                            cullMode;
         VK_FRONT_FACE_COUNTER_CLOCKWISE,                            // VkFrontFace                                frontFace;
 
         VK_FALSE,                                                   // VkBool32                                   depthBiasEnable;
@@ -469,13 +469,13 @@ VkResult VkcPipeline::bindFloatv(uint32_t binding, float values[], uint32_t size
     MgBuffer buffer = bindBuffers.take(binding);
     if (buffer.handle == VK_NULL_HANDLE)
     {
-        MG_ASSERT(buffer.create(maxSize * sizeof(float), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, pDevice));
+        mgAssert(buffer.create(maxSize * sizeof(float), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, pDevice));
         updateDescriptorSet = VK_TRUE;
     }
 
     // Map buffer memory to host.
     void *data = nullptr;
-    MG_ASSERT(vkMapMemory(pDevice->logical, buffer.memory, 0, size * sizeof(float), 0, &data));
+    mgAssert(vkMapMemory(pDevice->logical, buffer.memory, 0, size * sizeof(float), 0, &data));
 
     // Copy data to the buffer.
     memcpy(data, values, size * sizeof(float));
@@ -585,7 +585,7 @@ VkResult VkcPipeline::createShader(VkShaderModule &shader, QString fileName, con
     };
 
     // Create shader module.
-    MG_ASSERT(vkCreateShaderModule(device->logical, &shaderInfo, nullptr, &shader));
+    mgAssert(vkCreateShaderModule(device->logical, &shaderInfo, nullptr, &shader));
 
     return VK_SUCCESS;
 }

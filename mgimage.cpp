@@ -361,7 +361,7 @@ VkResult MgImage::loadImageData(MgBuffer *pImageBuffer)
 
     // Prepare the image.
     imageData = imageData.rgbSwapped();
-    imageData.convertToFormat(QImage::Format_RGBA8888);
+    imageData = imageData.convertToFormat(QImage::Format_RGBA8888);
 
     // Decide on the image extent.
     if (info.extent.width == 0 || info.extent.height == 0)
@@ -398,7 +398,7 @@ VkResult MgImage::loadImageData(MgBuffer *pImageBuffer)
 
     // Create image buffer.
     int size = (imageData.width() + 1) * (imageData.height() + 1) * 4 * 4 / 3;
-    MG_ASSERT(pImageBuffer->create(static_cast<uint32_t>(size), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, pDevice));
+    mgAssert(pImageBuffer->create(static_cast<uint32_t>(size), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, pDevice));
 
     // Copy image data to the buffer.
     mipOffsets[0] = 0;
@@ -414,7 +414,7 @@ VkResult MgImage::loadImageData(MgBuffer *pImageBuffer)
 
         // Map buffer memory to host.
         void *data;
-        MG_ASSERT(vkMapMemory(pDevice->logical, pImageBuffer->memory, mipOffsets[mip], mipSizes[mip], 0, &data));
+        mgAssert(vkMapMemory(pDevice->logical, pImageBuffer->memory, mipOffsets[mip], mipSizes[mip], 0, &data));
 
         // Copy mip data to buffer.
         memcpy(data, imageData.bits(), mipSizes[mip]);
@@ -423,27 +423,27 @@ VkResult MgImage::loadImageData(MgBuffer *pImageBuffer)
         vkUnmapMemory(pDevice->logical, pImageBuffer->memory);
 
         // Fill region data.
-        uint32_t width = static_cast<uint32_t>(imageData.width());
-        uint32_t height = static_cast<uint32_t>(imageData.height());
+        int width = imageData.width();
+        int height = imageData.height();
 
         VkBufferImageCopy region  =
         {
-            mipOffsets[mip],    // VkDeviceSize                bufferOffset;
-            width,              // uint32_t                    bufferRowLength;
-            height,             // uint32_t                    bufferImageHeight;
+            mipOffsets[mip],                    // VkDeviceSize                bufferOffset;
+            static_cast<uint32_t>(width),       // uint32_t                    bufferRowLength;
+            static_cast<uint32_t>(height),          // uint32_t                    bufferImageHeight;
 
-            {                   // VkImageSubresourceLayers    imageSubresource;
-                aspectMask,         // VkImageAspectFlags    aspectMask;
-                mip,                // uint32_t              mipLevel;
-                0,                  // uint32_t              baseArrayLayer;
-                1,                  // uint32_t              layerCount;
+            {                                   // VkImageSubresourceLayers    imageSubresource;
+                aspectMask,                         // VkImageAspectFlags    aspectMask;
+                mip,                                // uint32_t              mipLevel;
+                0,                                  // uint32_t              baseArrayLayer;
+                1,                                  // uint32_t              layerCount;
             },
 
-            {0, 0, 0},          // VkOffset3D                  imageOffset;
-            {                   // VkExtent3D                  imageExtent;
-                width,              // uint32_t    width;
-                height,             // uint32_t    height;
-                1                   // uint32_t    depth;
+            {0, 0, 0},                          // VkOffset3D                  imageOffset;
+            {                                   // VkExtent3D                  imageExtent;
+                static_cast<uint32_t>(width),       // uint32_t    width;
+                static_cast<uint32_t>(height),      // uint32_t    height;
+                1                                   // uint32_t    depth;
             }
         };
 
@@ -453,7 +453,7 @@ VkResult MgImage::loadImageData(MgBuffer *pImageBuffer)
         width = width == 1 ? 1 : width / 2;
         height = height == 1 ? 1 : height / 2;
 
-        imageData = imageData.scaled(static_cast<int>(width), static_cast<int>(height), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        imageData = imageData.scaled(width, height, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     }
 
     // Deallocate mip data.
